@@ -57,7 +57,7 @@ void setup()
 
 void loop()
 {
-	int mode;
+	byte mode;
 	mode = read_mode();
 	Serial.println(mode);
 	delay(100);
@@ -65,12 +65,12 @@ void loop()
 }
 
 //Functions
-int read_address(int address)
+byte read_address(byte address)
 {
     //read address function
     //procedure: lower CS pin -> send read instruction -> send address -> read output -> raise CS pin
     //(unimplemented) ability to read multiple bytes at the same time by sending more clock signals
-	int message;
+	byte message;
 
     //read instruction
 	SPI.transfer(SS_pin, 0x03, SPI_CONTINUE);
@@ -84,11 +84,11 @@ int read_address(int address)
 	return message
 }
 
-int read_Rx_buffer(int address)
+byte read_Rx_buffer(byte address)
 {
     //reads Rx buffer and clears the corresponding receive flag
     //procedure: lower CS pin -> send read instuction -> read output -> raise CS pin
-	int message;
+	byte message;
 
     //send custom read instruction
 	SPI.transfer(SS_pin, address, SPI_CONTINUE);
@@ -99,13 +99,13 @@ int read_Rx_buffer(int address)
 	return message
 }
 
-int read_status_bit()
+byte read_status_bit()
 {
     //reads certain status bit that are often used
     //procedure: lower CS pin ->send read status comand -> read output -> raise CS pin
     //(unimplemented) ability to read multiple bits at the same time by sending more clock signals
 
-	int message;
+	byte message;
 
     //send read status command
 	SPI.transfer(SS_pin, 0xA0, SPI_CONTINUE);
@@ -116,12 +116,12 @@ int read_status_bit()
 	return message
 }
 
-int get_Rx_Status()
+byte get_Rx_Status()
 {
     //quickly gets status data
     //procedure: lower CS pin -> send command byte -> read output -> raise CS pin
     //(unimplemented) ability to read multiple bits at the same time by sending more clock signals
-	int message;
+	byte message;
 
     //command byte
 	SPI.transfer(SS_pin, 0xB0, SPI_CONTINUE);
@@ -133,7 +133,7 @@ int get_Rx_Status()
 }
 
 
-void write_address(int address, int message)
+void write_address(byte address, byte message)
 {
     //Write to address function
     //procedure: lower CS pin -> send write command-> send address -> send byte -> raise CS pin
@@ -149,7 +149,7 @@ void write_address(int address, int message)
 	SPI.transfer(SS_pin, message, SPI_LAST);
 }
 
-void write_Tx_buffer(int address, int message)
+void write_Tx_buffer(byte address, byte message)
 {
     //writes to the Tx buffer
     //procedure: lower CS pin -> send command byte -> send message -> raise CS pin
@@ -162,7 +162,7 @@ void write_Tx_buffer(int address, int message)
 	SPI.transfer(SS_pin, message, SPI_LAST);
 }
 
-void modify_bit(int address, int mask, int data)
+void modify_bit(byte address, byte mask, byte data)
 {
     //sets or clears a certain bit
     //procedure: lower CS pin-> send bit modify command -> send address of register -> send mask byte -> send data byte -> raise CS pin
@@ -182,7 +182,7 @@ void modify_bit(int address, int mask, int data)
     SPI.transfer(SS_pin, data, SPI_LAST);
 }
 
-void init_2515(int CNF1_config, int CNF2_config, int CNF3_config, int RTS_config, int filter_num, int mask_num, int config_mode)
+void init_2515(byte CNF1_config, byte CNF2_config, byte CNF3_config, byte RTS_config, byte filter_num, byte mask_num, byte config_mode)
 {
     //used to initialize the MCP2515 (currently loopback will be the only one implemented)
     //loopback is used to internally test the 2515 + Due setup by internally moving TX straight to RX (Don't try to use transceivers)
@@ -232,7 +232,7 @@ void init_2515(int CNF1_config, int CNF2_config, int CNF3_config, int RTS_config
     set_config_mode(config_mode);
 }
 
-void reset(int CNF1_config, int CNF2_config, int CNF3_config, int RTS_config, int filter_num, int mask_num, int config_mode)
+void reset(byte CNF1_config, byte CNF2_config, byte CNF3_config, byte RTS_config, byte filter_num, byte mask_num, byte config_mode)
 {
     //used to reset the 2515 over software
     //note that the 2515 must be reconfigured after this happens
@@ -244,18 +244,18 @@ void reset(int CNF1_config, int CNF2_config, int CNF3_config, int RTS_config, in
 
 }
 
-int read_mode()
+byte read_mode()
 {
     //reads the current mode of the MCP2515 by looking at the CANSTAT.OPMODE bits
-	int message;
-	int mode;
+	byte message;
+	byte mode;
      //gets entire CAN status register
 	message = read_address(0x0E);
     mode = message >> 5;//gets bits 5-7
     return mode
 }
 
-void set_config_mode(int config_mode)
+void set_config_mode(byte config_mode)
 {
     /*sets config mode in the CANCTRL register (0Fh)
     000 = Normal Operation
@@ -269,8 +269,8 @@ void set_config_mode(int config_mode)
     2 = Loopback
     3 = Listen-only
     4 = Configuration*/
-    int message, cleared_config, new_config;
-    int shifted_config, clear_mask;
+    byte message, cleared_config, new_config;
+    byte shifted_config, clear_mask;
     //Read in bits
     message = read_address(0x0F);
 
