@@ -40,6 +40,8 @@ move into separate library
 Clean up code so that it meet code requirements
 */
 
+#include <SPI.h>
+
 const int SS_pin = ; //slave select pin
 
 void setup()
