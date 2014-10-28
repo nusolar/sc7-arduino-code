@@ -3,7 +3,7 @@
 //Current Version: 1.0
 /*
 Revision history:
-1.0 - created with basic functions (10/27/14)
+.9 - created with basic functions (10/27/14)
 */
 
 
@@ -24,8 +24,8 @@ SPI testing using Arduino Due:
 
 /*
 Testing Logs:
-10/27
-    Testing of SPI communications by reading the mode of the 2515 without initialization. Should default to config mode (5).
+10/29
+    Testing of SPI communications by reading the mode of the 2515 without initialization. Should default to config mode (4).
     Hardware setup used: SPI testing
     Results:
 
