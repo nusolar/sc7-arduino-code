@@ -1,0 +1,35 @@
+Driver controls state variables:
+
+-Raw acceleration : int             
+-Safe acceleration limit : int          
+-Brake engaged? : bool
+-Desired motor acceleration : float
+
+-Ignition on? : bool
+-In drive? : bool
+-In reverse? : bool
+-In regen? : bool
+
+-Left turn signal? : bool
+-Right turn signal? : bool
+-Headlights? : bool
+-Horn? : bool
+
+-BMS state : {Error, Idle, EnablePack, Measure, Precharge, Run}
+
+-Using hardware switches : bool????
+-Car velocity : float
+-Bus voltage : float					
+-Bus current : float					
+
+Driver controls RX/TX:
+
+TX
+-Drive command: sends the desired motor velocity (% of max) and desired
+current (% of max) to the motor controller.
+-Power command (probably unused): sends the percentage of current to draw
+from the bus to the motor controller.
+-Reset command (probably unused): resets the motor controller.
+-Switch position: send start or run commands to the BMS. Hardware side of this
+still needs to be fleshed out.
+-Display data: sends car state info to the LCD display.
