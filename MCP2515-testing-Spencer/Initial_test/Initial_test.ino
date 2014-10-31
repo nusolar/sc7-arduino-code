@@ -1,3 +1,5 @@
+#include <SPI.h>
+
 //Author Spencer Williams
 //Creation Date 10/27/14
 //Current Version: 0.91
@@ -28,8 +30,7 @@ Testing Logs:
 10/29
     Testing of SPI communications by reading the mode of the 2515 without initialization. Should default to config mode (4).
     Hardware setup used: SPI testing
-    Results:
-
+    Results: Received all 1s constantly. Confirmed that SPI worked by connecting MODSI+MISO
 */
 
 
@@ -40,13 +41,12 @@ move into separate library
 Clean up code so that it meet code requirements
 */
 
-#include <SPI.h>
 
-const int SS_pin = ; //slave select pin
+const int SS_pin = 10; //slave select pin
 
 void setup()
 {
-	Serial.begin(9600)
+	Serial.begin(9600);
 	pinMode(SS_pin, OUTPUT);
 	SPI.begin(SS_pin);
 	SPI.setBitOrder(SS_pin, MSBFIRST);
@@ -81,7 +81,7 @@ byte read_address(byte address)
     //read output
 	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
 
-	return message
+	return message;
 }
 
 byte read_Rx_buffer(byte address)
@@ -96,7 +96,7 @@ byte read_Rx_buffer(byte address)
     //read output
 	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
 
-	return message
+	return message;
 }
 
 byte read_status_bit()
@@ -113,7 +113,7 @@ byte read_status_bit()
     //read output
 	message = SPI.transfer(SS_pin, 0x00, SPI_CONTINUE);
 
-	return message
+	return message;
 }
 
 byte get_Rx_Status()
@@ -129,7 +129,7 @@ byte get_Rx_Status()
     //read byte
 	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
 
-	return message
+	return message;
 }
 
 
@@ -251,8 +251,8 @@ byte read_mode()
 	byte mode;
      //gets entire CAN status register
 	message = read_address(0x0E);
-    mode = message >> 5;//gets bits 5-7
-    return mode
+    mode = message;// >> 5;//gets bits 5-7
+    return mode;
 }
 
 void set_config_mode(byte config_mode)
