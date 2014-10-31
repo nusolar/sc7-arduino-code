@@ -1,35 +1,70 @@
-Driver controls state variables:
+State:
 
--Raw acceleration : int             
--Safe acceleration limit : int          
+-Raw acceleration : int
+	The raw value of the acceleration pedal.             
+-Safe acceleration limit : int
+	The value of a safe acceleration. Not clear on how this is calculated?????    
 -Brake engaged? : bool
+	True if the brake pedal is depressed, false otherwise.
 -Desired motor acceleration : float
+	Acceleration to be given to motor controller. Not clear on how this is
+	calculated????
 
--Ignition on? : bool
+-Key run? : bool
+	Not sure what this means???????
 -In drive? : bool
+	In drive gear?
 -In reverse? : bool
+	In reverse gear?
 -In regen? : bool
+	In regen mode?
 
 -Left turn signal? : bool
+	Left turn on?
 -Right turn signal? : bool
+	Right turn on?
 -Headlights? : bool
+	Headlights on?
 -Horn? : bool
+	Horn on?
+What about brake lights?????
 
 -BMS state : {Error, Idle, EnablePack, Measure, Precharge, Run}
+	BMS mode.
 
--Using hardware switches : bool????
+-Using hardware switches : bool    
+	Not sure what this means????????
 -Car velocity : float
--Bus voltage : float					
--Bus current : float					
+	Current velocity of the car.
+-Bus voltage : float
+	Voltage of the bus.					
+-Bus current : float
+	Current of the bus.					
 
-Driver controls RX/TX:
+RX/TX:
 
 TX
--Drive command: sends the desired motor velocity (% of max) and desired
-current (% of max) to the motor controller.
--Power command (probably unused): sends the percentage of current to draw
-from the bus to the motor controller.
--Reset command (probably unused): resets the motor controller.
--Switch position: send start or run commands to the BMS. Hardware side of this
-still needs to be fleshed out.
--Display data: sends car state info to the LCD display.
+-Drive command : driver controls -> motor controller
+	Send the desired motor velocity (% of max) and desired
+	current (% of max) to the motor controller.
+-Power command (probably unused) : driver controls -> motor controller
+	Send the percentage of current to draw
+	from the bus to the motor controller.
+-Reset command (probably unused) : driver controls -> motor controller
+	Reset the motor controller.
+-Switch position : driver controls -> BMS
+	Send start or run commands to the BMS. Hardware side of this
+	still needs to be fleshed out.
+-Display data : driver controls -> LCD dipsay
+	Send car state info to the LCD display.
+RX
+-BMS state : BMS -> driver controls
+	Precharge state of BMS.
+-Motor velocity : motor controller -> driver controls
+	Current speed of the motor.
+-Bus state : ?? -> driver controls
+	Bus voltage and current
+-User commands : ?? -> driver controls
+	Many status updates: key run?, in drive?, in reverse?,
+	in regen?, left turn signal?, right turn signal?, 
+	headlights?, horn?

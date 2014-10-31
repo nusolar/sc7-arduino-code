@@ -10,6 +10,10 @@
 #include "DaveAK_can/MCP2515_defs.h"
 #include "MCP2515_defs_extended.h"
 
+/*
+ * Class for handling CAN I/O operations using the
+ * MCP2515 CAN controller.
+ */
 class CAN_IO {
 public:
 	/*
@@ -21,22 +25,22 @@ public:
 	 * Initializes the CAN controller to desired settings,
 	 * including read masks/filters.
 	 */
-	void Setup();
+	void setup();
 
 	/*
 	 * Reads messages from the CAN controller.
 	 */
-	void Read_CAN();
+	void readCAN();
 
 	/*
 	 * Sends messages to the CAN bus via the controller.
 	 */
-	void send_CAN();
+	void sendCAN();
 
 	/*
 	 * ISR for MCP2515 interrupt.
 	 */
-	void RX_Int();
+	void rx_int();
 private:
 	MCP2515 controller;
 

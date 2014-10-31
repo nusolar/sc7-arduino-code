@@ -5,9 +5,11 @@
 
 #include "CAN_IO.h"
 
-CAN_IO::CAN_IO(): controller(MCP2515(1, 2)) {} // not sure of syntax or args
+CAN_IO::CAN_IO(): controller(1,2) { // not sure of syntax or args
+	setup();
+}
 
-void CAN_IO::Setup() {
+void CAN_IO::setup() {
 	// init the controller
 	controller.Init(25, 125); // not sure what this really does or what the args should be
 
@@ -25,15 +27,15 @@ void CAN_IO::Setup() {
 	// what else do we need to do?
 }
 
-void CAN_IO::Read_CAN() {
+void CAN_IO::readCAN() {
 	// implement!!!
 }
 
-void CAN_IO::Send_CAN() {
+void CAN_IO::sendCAN() {
 	// implement!!!
 }
 
-void CAN_IO::RX_Int() {
+void CAN_IO::rx_int() {
 	// implement!!
 }
 
