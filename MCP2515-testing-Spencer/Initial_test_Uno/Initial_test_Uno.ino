@@ -1,16 +1,15 @@
 //Author Spencer Williams
-//Creation Date 10/27/14
-//Current Version: 0.91
+//Creation Date 10/30/14
+//Current Version: 0.90
 /*
 Revision history:
-0.9 - created with basic functions (10/27/14)
-0.91 - set_config, init_2515, reset, and bit modify complete. All SPI functions now written (10/28/14)
+0.9 - created with basic functions (10/30/14)
 */
 
 
 /*
 Hardware setup:
-SPI testing using Arduino Due:
+SPI testing using Arduino Uno:
     1-8: disconnected
     9: Ground
     10-12: disconnected
@@ -19,13 +18,13 @@ SPI testing using Arduino Due:
     15: MISO
     16: CS
     17: disconnected
-    18: 3.3V
+    18: 5V
 */
 
 
 /*
 Testing Logs:
-10/29
+10/30
     Testing of SPI communications by reading the mode of the 2515 without initialization. Should default to config mode (4).
     Hardware setup used: SPI testing
     Results:
@@ -46,12 +45,12 @@ const int SS_pin = ; //slave select pin
 
 void setup()
 {
-	Serial.begin(9600)
+	Serial.begin(9600);
 	pinMode(SS_pin, OUTPUT);
-	SPI.begin(SS_pin);
-	SPI.setBitOrder(SS_pin, MSBFIRST);
-    SPI.setDataMode(SS_pin, SPI_MODE1); //(0,0) on ARM
-    SPI.setClockDivider(10);// 84 MHz / 10 = 8.4 MHz
+	SPI.begin();
+	SPI.setBitOrder(MSBFIRST);
+    SPI.setDataMode(SPI_MODE0);
+    SPI.setClockDivider(SPI_CLOCK_DIV_4);
     //init_2515();
 }
 
@@ -72,16 +71,19 @@ byte read_address(byte address)
     //(unimplemented) ability to read multiple bytes at the same time by sending more clock signals
 	byte message;
 
+    digitalWrite(SS_pin, LOW);
+
     //read instruction
-	SPI.transfer(SS_pin, 0x03, SPI_CONTINUE);
+	SPI.transfer(0x03);
 
     //send address
-	SPI.transfer(SS_pin, address, SPI_CONTINUE);
+	SPI.transfer(address);
 
     //read output
-	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
+	message = SPI.transfer(0x00);
 
-	return message
+    digitalWrite(SS_pin, HIGH);
+	return message;
 }
 
 byte read_Rx_buffer(byte address)
@@ -89,14 +91,15 @@ byte read_Rx_buffer(byte address)
     //reads Rx buffer and clears the corresponding receive flag
     //procedure: lower CS pin -> send read instuction -> read output -> raise CS pin
 	byte message;
-
+    digitalWrite(SS_pin, LOW);
     //send custom read instruction
-	SPI.transfer(SS_pin, address, SPI_CONTINUE);
+	SPI.transfer(address);
 
     //read output
-	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
-
-	return message
+	message = SPI.transfer(0x00);
+    
+    digitalWrite(SS_pin, HIGH);
+	return message;
 }
 
 byte read_status_bit()
@@ -106,14 +109,14 @@ byte read_status_bit()
     //(unimplemented) ability to read multiple bits at the same time by sending more clock signals
 
 	byte message;
-
+    digitalWrite(SS_pin, LOW);
     //send read status command
-	SPI.transfer(SS_pin, 0xA0, SPI_CONTINUE);
+	SPI.transfer(0xA0);
 
     //read output
-	message = SPI.transfer(SS_pin, 0x00, SPI_CONTINUE);
-
-	return message
+	message = SPI.transfer(0x00);
+    digitalWrite(SS_pin, HIGH);
+	return message;
 }
 
 byte get_Rx_Status()
@@ -122,14 +125,15 @@ byte get_Rx_Status()
     //procedure: lower CS pin -> send command byte -> read output -> raise CS pin
     //(unimplemented) ability to read multiple bits at the same time by sending more clock signals
 	byte message;
-
+    digitalWrite(SS_pin, LOW);
     //command byte
-	SPI.transfer(SS_pin, 0xB0, SPI_CONTINUE);
+	SPI.transfer(0xB0);
 
     //read byte
-	message = SPI.transfer(SS_pin, 0x00, SPI_LAST);
+	message = SPI.transfer(0x00);
 
-	return message
+    digitalWrite(SS_pin, HIGH);
+	return message;
 }
 
 
@@ -139,14 +143,17 @@ void write_address(byte address, byte message)
     //procedure: lower CS pin -> send write command-> send address -> send byte -> raise CS pin
     //(unimplemented) ability to write multiple bits at the same time by sending more clock signals
 
+    digitalWrite(SS_pin, LOW);
     //send write command
-	SPI.transfer(SS_pin, 0x02, SPI_CONTINUE);
+	SPI.transfer(0x02);
 
     //send address
-	SPI.transfer(SS_pin, address, SPI_CONTINUE);
+	SPI.transfer(address);
 
     //send byte
-	SPI.transfer(SS_pin, message, SPI_LAST);
+	SPI.transfer(message);
+    
+    digitalWrite(SS_pin, HIGH);
 }
 
 void write_Tx_buffer(byte address, byte message)
@@ -154,12 +161,15 @@ void write_Tx_buffer(byte address, byte message)
     //writes to the Tx buffer
     //procedure: lower CS pin -> send command byte -> send message -> raise CS pin
     //Note: unsure of the validity of this procedure, more testing required
-
+    digitalWrite(SS_pin, LOW);
+    
     //send command byte
-	SPI.transfer(SS_pin, address, SPI_CONTINUE);
+	SPI.transfer(address);
 
     //send message
-	SPI.transfer(SS_pin, message, SPI_LAST);
+	SPI.transfer(message);
+
+    digitalWrite(SS_pin, HIGH);
 }
 
 void modify_bit(byte address, byte mask, byte data)
@@ -169,17 +179,21 @@ void modify_bit(byte address, byte mask, byte data)
     //note that only certain bits can be set
     //Use this function CAREFULLY. using this on a non-bit-modifiable register will set the mask to FFh, causing a byte-write
 
+    digitalWrite(SS_pin, LOW);
+
     //send bit modify command
-	SPI.transfer(SS_pin, 0x05, SPI_CONTINUE);
+	SPI.transfer(0x05);
 
     //send register address
-    SPI.transfer(SS_pin, address, SPI_CONTINUE);
+    SPI.transfer(address);
 
     //send mask byte
-    SPI.transfer(SS_pin, mask, SPI_CONTINUE);
+    SPI.transfer(mask);
 
     //send data byte
-    SPI.transfer(SS_pin, data, SPI_LAST);
+    SPI.transfer(data);
+
+    digitalWrite(SS_pin, HIGH);
 }
 
 void init_2515(byte CNF1_config, byte CNF2_config, byte CNF3_config, byte RTS_config, byte filter_num, byte mask_num, byte config_mode)
@@ -237,8 +251,12 @@ void reset(byte CNF1_config, byte CNF2_config, byte CNF3_config, byte RTS_config
     //used to reset the 2515 over software
     //note that the 2515 must be reconfigured after this happens
     //Sends reset signal
-    SPI.transfer(SS_pin, 0xC0, SPI_LAST);//reset = 1100 0000
 
+    digitalWrite(SS_pin, LOW);
+
+    SPI.transfer(0xC0);//reset = 1100 0000
+
+    digitalWrite(SS_pin, HIGH);
 	//reinitializes 2515
 	init_2515(CNF1_config, CNF2_config, CNF3_config, RTS_config, filter_num, mask_num, config_mode);
 
@@ -252,7 +270,7 @@ byte read_mode()
      //gets entire CAN status register
 	message = read_address(0x0E);
     mode = message >> 5;//gets bits 5-7
-    return mode
+    return mode;
 }
 
 void set_config_mode(byte config_mode)
