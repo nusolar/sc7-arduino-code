@@ -28,13 +28,13 @@ void DriverControls::sendCAN() {
 void DriverControls::readCAN() {
 	// receive incoming packet and identify
 
-		// BMS state? update BMS state
+		// BMS state? update BMS state (should include info about the voltage and current drawn from each pack, for telemetry purposes.) [How frequently do we need to see this one before we conclude something is wrong?]
 
 		// Motor velocity? update car velocity
 
 		// Motor bus? update bus state info
 
-		// User cmds? update state info
+		// User cmds? update state info [How frequently does this need to arrive in order to be safe?]
 
 	// update timers
 

@@ -19,6 +19,8 @@ State:
 -In regen? : bool
 	In regen mode?
 
+[Note: We can combine these ^ into one variable controlled by constants: e.g. gear = G_DRIVE or gear = G_REV. - AM 10/31/14]
+
 -Left turn signal? : bool
 	Left turn on?
 -Right turn signal? : bool
@@ -27,13 +29,16 @@ State:
 	Headlights on?
 -Horn? : bool
 	Horn on?
-What about brake lights?????
+-Brakes : bool
+	Whether the brake pedal is engaged. Brake lights should turn on.
 
 -BMS state : {Error, Idle, EnablePack, Measure, Precharge, Run}
 	BMS mode.
 
--Using hardware switches : bool    
-	Not sure what this means????????
+[-Using hardware switches : bool    
+	Not sure what this means???????? DO NOT NEED]
+[Note: Use hardware switches was a hack that Chandel made last year while he was making the touch-screen steering system for the car. We'll be designing better in SC7, so we do not need to worry about this; hardware switches will be used at ALL times for now. -AM 10/31/14]
+
 -Car velocity : float
 	Current velocity of the car.
 -Bus voltage : float
@@ -52,19 +57,20 @@ TX
 	from the bus to the motor controller.
 -Reset command (probably unused) : driver controls -> motor controller
 	Reset the motor controller.
+	[ When does this need to be sent? -AM 10/31/14] ##########
 -Switch position : driver controls -> BMS
 	Send start or run commands to the BMS. Hardware side of this
 	still needs to be fleshed out.
--Display data : driver controls -> LCD dipsay
-	Send car state info to the LCD display.
+-Display data : driver controls -> Steering wheel
+	Send car state info to the LCD display. Waiting for hardware information.
 RX
 -BMS state : BMS -> driver controls
 	Precharge state of BMS.
 -Motor velocity : motor controller -> driver controls
 	Current speed of the motor.
--Bus state : ?? -> driver controls
-	Bus voltage and current
--User commands : ?? -> driver controls
+-Bus state : Motor Controller -> driver controls
+	Bus voltage and current 
+-User commands : Steering wheel -> driver controls
 	Many status updates: key run?, in drive?, in reverse?,
 	in regen?, left turn signal?, right turn signal?, 
-	headlights?, horn?
+	headlights?, horn? 
