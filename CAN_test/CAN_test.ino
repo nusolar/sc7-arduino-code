@@ -1,9 +1,7 @@
 #include <SPI.h>
 
-#include <MCP2515.h>
-#include <MCP2515_defs.h>
-
-#include <bitset>
+#include "MCP2515.h"
+#include "MCP2515_defs.h"
 
 byte bits;
 
@@ -11,8 +9,8 @@ MCP2515 CCAN(4,5);
 void setup() {
   
   // dataMode can be SPI_MODE0 or SPI_MODE3 only for MCP2515
-  SPI.setClockDivider(SPI_CLOCK_DIV16);
-  SPI.setDataMode(SPI_MODE3);
+  SPI.setClockDivider(10);
+  SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   SPI.begin();
   

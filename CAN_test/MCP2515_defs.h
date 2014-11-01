@@ -84,7 +84,7 @@ typedef struct
 #define TXB0D5          0x3B
 #define TXB0D6          0x3C
 #define TXB0D7          0x3D
-                        
+                         
 // TX Buffer 1
 #define TXB1CTRL        0x40
 #define TXB1SIDH        0x41
@@ -116,7 +116,7 @@ typedef struct
 #define TXB2D5          0x5B
 #define TXB2D6          0x5C
 #define TXB2D7          0x5D
-                        
+                         
 // RX Buffer 0
 #define RXB0CTRL        0x60
 #define RXB0SIDH        0x61
@@ -132,7 +132,7 @@ typedef struct
 #define RXB0D5          0x6B
 #define RXB0D6          0x6C
 #define RXB0D7          0x6D
-                        
+                         
 // RX Buffer 1
 #define RXB1CTRL        0x70
 #define RXB1SIDH        0x71
@@ -156,5 +156,10 @@ typedef struct
 #define TXB1            0x02
 #define TXB2            0x04
 #define TXB_ALL                  TXB0 | TXB1 | TXB2
+
+// Buffer Full Flags
+#define RXB0Full        0x01;
+#define RXB1Full        0x02;
+#define RXB_All                  RXB1Full | RXB2Full
 
 #endif

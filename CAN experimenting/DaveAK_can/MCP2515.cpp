@@ -11,7 +11,7 @@
   http://en.wikipedia.org/wiki/CAN_bus
 */
 
-#include "WProgram.h"
+#include "Arduino.h"
 #include "SPI.h"
 #include "MCP2515.h"
 #include "MCP2515_defs.h"
@@ -124,12 +124,12 @@ bool MCP2515::_init(int CAN_Bus_Speed, byte Freq, byte SJW, bool autoBaud) {
   if(PHSEG2 <= SJW) return false;
   
   byte BTLMODE = 1;
-  byte SAM = 0;
+  byte __SAM = 0;
   
   // Set registers
   byte data = (((SJW-1) << 6) | BRP);
   Write(CNF1, data);
-  Write(CNF2, ((BTLMODE << 7) | (SAM << 6) | ((PHSEG1-1) << 3) | (PRSEG-1)));
+  Write(CNF2, ((BTLMODE << 7) | (__SAM << 6) | ((PHSEG1-1) << 3) | (PRSEG-1)));
   Write(CNF3, (B10000000 | (PHSEG2-1)));
   Write(TXRTSCTRL,0);
   
