@@ -4,6 +4,18 @@
 #include "MCP2515_defs.h"
 
 byte bits;
+Frame f;
+/*
+typedef struct
+{
+      unsigned long id;      // EID if ide set, SID otherwise
+      byte srr;                  // Standard Frame Remote Transmit Request
+      byte rtr;                  // Remote Transmission Request
+      byte ide;                  // Extended ID flag
+      byte dlc;                  // Number of data bytes
+      byte data[8];            // Data bytes
+} Frame;
+*/
 
 MCP2515 CCAN(4,5);
 void setup() {
@@ -18,14 +30,22 @@ void setup() {
   Serial.begin(9600);
   while(Serial.read() != '1') ;
   Serial.write(CCAN.Init(125,20) + '0');
-
+  f.id=0x011;
+  f.srr = 0;
+  f.rtr = 0;
+  f.ide = 0;
+  f.dlc = 2;
+  f.data[0] = 5;
+  f.data[1] = 10;
 }
 
 
 void loop() {
   // put your main code here, to run repeatedly:
-  bits = CCAN.Read(CANCTRL);
+  /*bits = CCAN.Read(CANCTRL);
 Serial.println(bits);
-bits = 0;
-delay(500);    
+bits = 0;*/
+CCAN.LoadBuffer(TXB0,f);
+CCAN.SendBuffer(TXB0);
+delay(500);
 }
