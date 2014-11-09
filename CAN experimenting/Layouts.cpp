@@ -19,6 +19,22 @@ void Layout::set_header(Frame& f) {
 	f.srr = 0;
 }
 
+Frame MC_Heartbeat::generate_frame() {
+	Frame f;
+	f.low = trituim_id;
+	f.high = serial_no;
+	set_header(f);
+	return f;
+}
+
+Frame MC_Velocity::generate_frame() {
+	Frame f;
+	f.low = car_velocity;
+	f.high = motor_velocity;
+	set_header(f);
+	return f;
+}
+
 Frame DriveCmd::generate_frame() {
 	Frame f;
 	f.low = velocity;

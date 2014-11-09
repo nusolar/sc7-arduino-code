@@ -8,34 +8,7 @@
 
 #include <cstdint>
 #include "PacketIDs.h"
-//#include "MCP2515_defs.h"
-
-typedef struct
-{
-      unsigned long id;      // EID if ide set, SID otherwise
-      uint8_t srr;                  // Standard Frame Remote Transmit Request
-      uint8_t rtr;                  // Remote Transmission Request
-      uint8_t ide;                  // Extended ID flag
-      uint8_t dlc;                  // Number of data bytes
-      union {
-        // 8 bytes
-        uint64_t value;
-        // 4 bytes
-        struct {
-          uint32_t low;
-          uint32_t high;
-        };
-        // 2 bytes
-        struct {
-          uint16_t s0;
-          uint16_t s1;
-          uint16_t s2;
-          uint16_t s3;
-        };
-        // 1 byte
-        uint8_t data[8];
-      };
-} Frame;
+#include "MCP2515_defs.h"
 
 /*
  * Abstract base packet.
@@ -55,12 +28,32 @@ protected:
 	void set_header(Frame& f);
 };
 
+class MC_Heartbeat : public Layout {
+	MC_Heartbeat(uint32_t t_id, uint32_t s_no) : trituim_id(t_id), serial_no(s_no) { id = MC_HEARTBEAT_ID; }
+	MC_Heartbeat(Frame& frame) : trituim_id(frame.low), serial_no(frame.high) { id = frame.id; }
+
+	Frame generate_frame();
+
+	uint32_t trituim_id;
+	uint32_t serial_no;
+};
+
+class MC_Velocity : public Layout {
+	MC_Velocity(uint32_t car_v, uint32_t motor_v) : car_velocity(car_v), motor_velocity(motor_v) { id = MC_VELOCITY_ID; }
+	MC_Velocity(Frame& frame) : car_velocity(frame.low), motor_velocity(frame.high) { id = frame.id; }
+
+	Frame generate_frame();
+
+	uint32_t car_velocity;
+	uint32_t motor_velocity;
+};
+
 /*
- * Drive command packet.
+ * Driver controls drive command packet.
  */
 class DriveCmd : public Layout {
 public:
-	DriveCmd(float c, float v) : current(c), velocity(v) { id = DRIVE_CMD_ID; }
+	DriveCmd(float v, float c) : current(c), velocity(v) { id = DRIVE_CMD_ID; }
 	DriveCmd(Frame& frame) : velocity(frame.low), current(frame.high) { id = frame.id; }
 
 	Frame generate_frame();
@@ -70,7 +63,7 @@ public:
 };
 
 /*
- * Motor power command packet.
+ * Driver controls power command packet.
  */
 class PowerCmd : public Layout {
 public:
