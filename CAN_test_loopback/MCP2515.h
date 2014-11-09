@@ -43,7 +43,7 @@ class MCP2515
 
       // Extra functions
       bool Interrupt(); // Expose state of INT pin
-      byte GetInterrupts(); // Returns the ICOD flags in the CANSTAT register.
+      byte GetInterrupt(); // Returns CANINTF Register
       bool ResetInterrupt(byte intSelect); // Resets the interrupt flags specified (use ORed combination of CANINTF flags)
       bool Mode(byte mode); // Returns TRUE if mode change successful
       
