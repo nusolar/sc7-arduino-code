@@ -34,10 +34,9 @@ void test_layout(Layout& layout) {
 }
 
 int main() {
-	DriveCmd drive_cmd(100.0f, 50.0f);
-
 	Layout l;
-	Frame drive_frame = drive_cmd.generate_frame();
+	DriveCmd drive_cmd(100.0f, 50.0f);
+	PowerCmd power_cmd(70.0f);
 
 	Frame f;
 	f.id = DRIVE_CMD_ID;
@@ -52,6 +51,7 @@ int main() {
 	test_layout(l);
 	test_layout(drive_cmd);
 	test_layout(drive_cmd2);
+	test_layout(power_cmd);
 
 	return 0;
 }

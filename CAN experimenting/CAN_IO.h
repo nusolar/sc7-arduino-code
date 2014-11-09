@@ -64,7 +64,7 @@ public:
 	/*
 	 * Sends messages to the CAN bus via the controller.
 	 */
-	void send_CAN();
+	void send_CAN(Layout& layout);
 private:
 	MCP2515 controller;
 

@@ -60,15 +60,7 @@ protected:
  */
 class DriveCmd : public Layout {
 public:
-	/*
-	 * Initializes the DriveCmd with current c and velocity v.
-	 * Used by the sender.
-	 */
 	DriveCmd(float c, float v) : current(c), velocity(v) { id = DRIVE_CMD_ID; }
-
-	/*
-	 * Initializes a DriveCmd from the given Frame. Used by the receiver.
-	 */
 	DriveCmd(Frame& frame) : velocity(frame.low), current(frame.high) { id = frame.id; }
 
 	Frame generate_frame();
@@ -80,32 +72,14 @@ public:
 /*
  * Motor power command packet.
  */
-class PowerCmd : Layout {
+class PowerCmd : public Layout {
 public:
-	PowerCmd(float busCurrent);
-	PowerCmd(Frame& frame);
+	PowerCmd(float bc) : bus_current(bc) { id = POWER_CMD_ID; }
+	PowerCmd(Frame& frame) : bus_current(frame.low) { id = frame.id; }
 
-	float busCurrent;
-};
+	Frame generate_frame();
 
-/*
- * Motor velocity packet.
- */
-class MotorVelCmd : Layout {
-public:
-	MotorVelCmd(float carVelocity, float motorVelocity);
-	MotorVelCmd(Frame& frame);
-
-	float carVelocity;
-	float motorVelocity;
-};
-
-class BusStateCmd : Layout {
-public:
-	BusStateCmd(float busCurrent, float busVoltage);
-
-	float busCurrent;
-	float busVoltage;
+	float bus_current;
 };
 
 #endif

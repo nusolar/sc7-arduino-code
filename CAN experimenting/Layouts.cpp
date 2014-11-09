@@ -26,3 +26,11 @@ Frame DriveCmd::generate_frame() {
 	set_header(f);
 	return f;
 }
+
+Frame PowerCmd::generate_frame() {
+	Frame f;
+	f.low = bus_current;
+	f.high = 0;
+	set_header(f);
+	return f;
+}
