@@ -14,6 +14,7 @@
 #ifndef MCP2515_defs_h
 #define MCP2515_defs_h
 
+#include <cstdint>
 #include "Arduino.h"
 
 typedef struct

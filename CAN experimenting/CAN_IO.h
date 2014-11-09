@@ -6,6 +6,7 @@
 #ifndef CAN_IO_h
 #define CAN_IO_h
 
+#include <cstdint>
 #include "DaveAK_can/MCP2515.h"
 #include "DaveAK_can/MCP2515_defs.h"
 

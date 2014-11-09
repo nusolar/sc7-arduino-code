@@ -11,7 +11,7 @@ Frame Layout::generate_frame() {
 	return f;
 }
 
-Frame Layout::frame_header(Frame& f) {
+Frame Layout::set_header(Frame& f) {
 	f.id = id;
 	f.dlc = 8; // send 8 bytes
 	f.ide = 0; // standard frame
@@ -19,15 +19,9 @@ Frame Layout::frame_header(Frame& f) {
 	return f;
 }
 
-DriveCmd::DriveCmd(Frame& frame) {
-	id = DRIVE_CMD_ID;
-	velocity = frame.data.low; // convert properly!
-	current = frame.data.high; // convert properly!
-}
-
-DriveCmd::generate_frame() {
+Frame DriveCmd::generate_frame() {
 	Frame f;
-	f.data.low = velocity;
-	f.data.high = current;
+	f.low = velocity;
+	f.high = current;
 	return set_header(f);
 }
