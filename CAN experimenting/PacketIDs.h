@@ -6,6 +6,6 @@
 #ifndef PacketIDs_h
 #define PacketIDs_h
 
-#define DriveCMD_ID		0x501
+#define DRIVE_CMD_ID		0x501
 
 #endif

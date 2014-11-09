@@ -105,17 +105,13 @@ void CAN_IO::write_rx_filter(uint8_t address, uint16_t data) {
 }
 
 uint8_t CAN_IO::first_byte(uint16_t value) {
-	value &= 0x07F0;
-	value >>= 5;
-	return value;
+	return (value >> 3) & 0x00FF;
 	//return (value - (value % 16)) / 16;
 	// how does conversion to byte happen?
 }
 
 uint8_t CAN_IO::second_byte(uint16_t value) {
-	value &= 0x000F;
-	value <<= 4;
-	return value;
+	return (value << 5) & 0x0070;
 	//return (value % 16) * 16;
 	// how does conversion to byte happen?
 }

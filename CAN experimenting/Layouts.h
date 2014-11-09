@@ -9,39 +9,21 @@
 #include "MCP2515_defs.h"
 
 /*
- * Union for accessing the data of a CAN packet.
- * Data can be accessed as one-byte, two-byte,
- * four-byte, or eight-byte chuncks.
- */
-union LayoutUnion {
-	// 8 bytes
-	uint64_t value;
-	// 4 bytes
-  	struct {
-    	uint32_t low;
-    	uint32_t high;
-  	};
-  	// 2 bytes
-  	struct {
-        uint16_t s0;
-    	uint16_t s1;
-    	uint16_t s2;
-    	uint16_t s3;
-    };
-    // 1 byte
-  	uint8_t data[8];
-};
-
-/*
  * Abstract base packet.
  */
 class Layout {
 public:
-	//LayoutUnion data;
-	uint16_t id;
+	/*
+	 * Creates a Frame object to represent this layout.
+	 */
 	Frame generate_frame();
+
+	uint16_t id;
 protected:
-	void copy_data(uint8_t* source, uint8_t* destination);
+	/*
+	 * Fill out the header info for a frame.
+	 */
+	Frame set_header(Frame& f);
 };
 
 /*
@@ -49,7 +31,15 @@ protected:
  */
 class DriveCmd : Layout {
 public:
-	DriveCmd(float current, float velocity);
+	/*
+	 * Initializes the DriveCmd with current c and velocity v.
+	 * Used by the sender.
+	 */
+	DriveCmd(float c, float v) : id(DRIVE_CMD_ID), current(c), velocity(v) {}
+
+	/*
+	 * Initializes a DriveCmd from the given Frame. Used by the receiver.
+	 */
 	DriveCmd(Frame& frame);
 
 	float current;

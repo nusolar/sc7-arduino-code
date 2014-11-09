@@ -8,33 +8,26 @@
 
 Frame Layout::generate_frame() {
 	Frame f;
-
-	f.id = id;
-	f.dlc = 8;
-	copy_data(data.bytes, f.data);
-	//f.low = velocity...
-
 	return f;
 }
 
-void Layout::copy_data(uint8_t* source, uint8_t* destination) {
-	for (int i = 0; i < 8; i++) {
-		destination[i] = source[i];
-	}
-}
-
-DriveCmd::DriveCmd(float velocity, float current) {
-	data.low = velocity; // convert properly!
-	data.high = current; // convert properly!
-	id = DriveCmd_ID; // make constants for these!
-	this->velocity = velocity;
-	this->current = current;
+Frame Layout::frame_header(Frame& f) {
+	f.id = id;
+	f.dlc = 8; // send 8 bytes
+	f.ide = 0; // standard frame
+	f.rtr = 0; // data frame
+	return f;
 }
 
 DriveCmd::DriveCmd(Frame& frame) {
+	id = DRIVE_CMD_ID;
+	velocity = frame.data.low; // convert properly!
+	current = frame.data.high; // convert properly!
+}
 
-	copy_data(frame.data, data.bytes);
-	velocity = data.low; // convert properly!
-	current = data.high; // convert properly!
-	id = DriveCmd_ID;
+DriveCmd::generate_frame() {
+	Frame f;
+	f.data.low = velocity;
+	f.data.high = current;
+	return set_header(f);
 }
