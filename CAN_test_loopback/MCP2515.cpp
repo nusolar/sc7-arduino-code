@@ -350,7 +350,7 @@ bool MCP2515::ResetInterrupt(byte intSelect)
   BitModify(CANINTF,intSelect,0x00);
 }
 
-byte MCP2515::GetInterrupts()
+byte MCP2515::GetInterrupt()
 {
   return Read(CANINTF);
 }
@@ -364,7 +364,7 @@ bool MCP2515::Mode(byte mode) {
   MODE_SLEEP
   MODE_NORMAL
   */
-  BitModify(CANCTRL, B11100000, mode);
+  BitModify(CANCTRL, 0b11100000, mode);
   delay(10); // allow for any transmissions to complete
   byte data = Read(CANSTAT); // check mode has been set
   return ((data & mode)==mode);
