@@ -31,6 +31,7 @@ class MCP2515
     void Reset();
     byte Read(byte address);
     void Read(byte address, byte data[], byte bytes);
+      byte CheckBuffers();
       Frame ReadBuffer(byte buffer);
       void Write(byte address, byte data);
       void Write(byte address, byte data[], byte bytes);
@@ -42,6 +43,8 @@ class MCP2515
 
       // Extra functions
       bool Interrupt(); // Expose state of INT pin
+      byte GetInterrupts(); // Returns the ICOD flags in the CANSTAT register.
+      bool ResetInterrupt(byte intSelect); // Resets the interrupt flags specified (use ORed combination of CANINTF flags)
       bool Mode(byte mode); // Returns TRUE if mode change successful
       
   private:

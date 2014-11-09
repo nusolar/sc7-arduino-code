@@ -14,7 +14,7 @@
 #ifndef MCP2515_h
 #define MCP2515_h
 
-#include "WProgram.h"
+#include "Arduino.h"
 #include "MCP2515_defs.h"
 
 class MCP2515
@@ -44,7 +44,7 @@ class MCP2515
       // Extra functions
       bool Interrupt(); // Expose state of INT pin
       byte GetInterrupts(); // Returns the ICOD flags in the CANSTAT register.
-      void ResetInterrupts(byte intSelect); // Resets the interrupt flags specified (use ORed combination of CANINTF flags)
+      bool ResetInterrupt(byte intSelect); // Resets the interrupt flags specified (use ORed combination of CANINTF flags)
       bool Mode(byte mode); // Returns TRUE if mode change successful
       
   private:

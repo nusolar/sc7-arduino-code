@@ -14,7 +14,7 @@
 #ifndef MCP2515_defs_h
 #define MCP2515_defs_h
 
-#include "WProgram.h"
+#include "Arduino.h"
 
 typedef struct
 {

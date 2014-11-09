@@ -41,7 +41,7 @@ Clean up code so that it meet code requirements
 
 #include <SPI.h>
 
-const int SS_pin = ; //slave select pin
+const int SS_pin = 10; //slave select pin
 
 void setup()
 {
@@ -50,7 +50,7 @@ void setup()
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
-    SPI.setClockDivider(SPI_CLOCK_DIV_4);
+    SPI.setClockDivider(SPI_CLOCK_DIV4);
     //init_2515();
 }
 
@@ -269,7 +269,7 @@ byte read_mode()
 	byte mode;
      //gets entire CAN status register
 	message = read_address(0x0E);
-    mode = message >> 5;//gets bits 5-7
+    mode = message;// >> 5;//gets bits 5-7
     return mode;
 }
 
