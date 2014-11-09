@@ -5,26 +5,22 @@
 
 #include <iostream>
 #include <bitset>
+#include <cstdint>
 
-using std::cout;
-using std::cin;
-using std::endl;
+using namespace std;
 
-typedef unsigned int byte; // won't compile with byte
-
-byte first_byte(unsigned int value) {
-	return (value - (value % 16)) / 16;
+uint8_t first_byte(unsigned int value) {
+	return (value >> 3) & 0x00FF;
 	// how does conversion to byte happen?
 }
 
-byte second_byte(unsigned int value) {
-	return (value % 16) * 16;
+uint8_t second_byte(unsigned int value) {
+	return (value << 5) & 0x00E0;
 	// how does conversion to byte happen?
 }
 
 int main() {
-	bool done = false;
-	int value, first, second;
+	uint16_t value, first, second;
 	std::bitset<12> value_bits;
 	std::bitset<8> first_bits, second_bits;
 	char response = 'y';

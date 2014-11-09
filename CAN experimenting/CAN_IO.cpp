@@ -11,8 +11,14 @@ CAN_IO::CAN_IO(byte CS_pin, byte INT_pin):
 	buffer_index(0) {}
 
 void CAN_IO::setup(FilterInfo& filters) {
+	// SPI setup
+	SPI.setClockDivider(10);
+  	SPI.setDataMode(SPI_MODE0);
+  	SPI.setBitOrder(MSBFIRST);
+  	SPI.begin();
+  	
 	// init the controller
-	int baudRate = controller.Init(25, 125); // not sure what this really does or what the args should be
+	int baudRate = controller.Init(125, 25);
 
 	if (baudRate <= 0) { // error
 		status = Error;

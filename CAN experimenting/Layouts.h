@@ -45,14 +45,14 @@ public:
 	/*
 	 * Creates a Frame object to represent this layout.
 	 */
-	Frame generate_frame();
+	virtual Frame generate_frame();
 
 	uint16_t id;
 protected:
 	/*
 	 * Fill out the header info for a frame.
 	 */
-	Frame set_header(Frame& f);
+	void set_header(Frame& f);
 };
 
 /*

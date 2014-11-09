@@ -11,17 +11,18 @@ Frame Layout::generate_frame() {
 	return f;
 }
 
-Frame Layout::set_header(Frame& f) {
+void Layout::set_header(Frame& f) {
 	f.id = id;
 	f.dlc = 8; // send 8 bytes
-	f.ide = 0; // standard frame
-	f.rtr = 0; // data frame
-	return f;
+	f.ide = 0; // make it a standard frame
+	f.rtr = 0; // make it a data frame
+	f.srr = 0;
 }
 
 Frame DriveCmd::generate_frame() {
 	Frame f;
 	f.low = velocity;
 	f.high = current;
-	return set_header(f);
+	set_header(f);
+	return f;
 }

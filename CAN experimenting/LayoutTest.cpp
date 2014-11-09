@@ -5,45 +5,53 @@
 
 #include <iostream>
 #include <cstdint>
+#include <bitset>
 
 #include "Layouts.h"
 
 using namespace std;
 
-void test_layout(Layout*);
+void test_layout(Layout& layout) {
+	cout << endl;
+	bitset<8> bits8;
+
+	Frame layout_frame = layout.generate_frame();
+	cout << "Frame id: 0x" << hex << layout_frame.id << dec << endl;
+	bits8 = bitset<8>(layout_frame.dlc);
+	cout << "Frame dlc: " << bits8 << endl;
+	bits8 = bitset<8>(layout_frame.ide);
+	cout << "Frame ide: " << bits8 << endl;
+	bits8 = bitset<8>(layout_frame.rtr);
+	cout << "Frame rtr: " << bits8 << endl;
+	bits8 = bitset<8>(layout_frame.srr);
+	cout << "Frame srr: " << bits8 << endl;
+	cout << "Frame data low: " << layout_frame.low << endl;
+	cout << "Frame data high: " << layout_frame.high << endl;
+	for (int i = 0; i < 8; i++) {
+		bits8 = bitset<8>(layout_frame.data[i]);
+		cout << "Frame data byte " << i << ": " << bits8 << endl;
+	}
+}
 
 int main() {
 	DriveCmd drive_cmd(100.0f, 50.0f);
 
+	Layout l;
 	Frame drive_frame = drive_cmd.generate_frame();
-	cout << "Frame id: " << drive_frame.id << endl;
-	cout << "Frame dlc: " << drive_frame.dlc << endl;
-	cout << "Frame ide: " << drive_frame.id << endl;
-	cout << "Frame rtr: " << drive_frame.rtr << endl;
-	cout << "Frame srr: " << drive_frame.srr << endl;
-	cout << "Frame data low: " << drive_frame.low << endl;
-	cout << "Frame data high: " << drive_frame.high << endl;
-	for (int i = 0; i < 8; i++) {
-		cout << "Frame data byte " << i << ": " << drive_frame.data[i] << endl;
-	}
 
-	test_layout(&drive_cmd);
+	Frame f;
+	f.id = DRIVE_CMD_ID;
+	f.dlc = 5;
+	f.ide = 1;
+	f.rtr = 3;
+	f.srr = 2;
+	f.low = 20;
+	f.high = 80;
+	DriveCmd drive_cmd2(f);
+
+	test_layout(l);
+	test_layout(drive_cmd);
+	test_layout(drive_cmd2);
 
 	return 0;
-}
-
-void test_layout(Layout* layout) {
-	cout << "\n\n" << endl;
-
-	Frame layout_frame = layout->generate_frame();
-	cout << "Frame id: " << layout_frame.id << endl;
-	cout << "Frame dlc: " << layout_frame.dlc << endl;
-	cout << "Frame ide: " << layout_frame.id << endl;
-	cout << "Frame rtr: " << layout_frame.rtr << endl;
-	cout << "Frame srr: " << layout_frame.srr << endl;
-	cout << "Frame data low: " << layout_frame.low << endl;
-	cout << "Frame data high: " << layout_frame.high << endl;
-	for (int i = 0; i < 8; i++) {
-		cout << "Frame data byte " << i << ": " << layout_frame.data[i] << endl;
-	}
 }
