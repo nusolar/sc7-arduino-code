@@ -31,7 +31,7 @@ class MCP2515
     void Reset();
     byte Read(byte address);
     void Read(byte address, byte data[], byte bytes);
-      byte checkBuffers() 
+      byte CheckBuffers();
       Frame ReadBuffer(byte buffer);
       void Write(byte address, byte data);
       void Write(byte address, byte data[], byte bytes);

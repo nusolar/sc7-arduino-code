@@ -15,7 +15,7 @@
  // filters for RX buffer 1
  #define RXF2SIDH 	0x08
  #define RXF2SIDL 	0x09
- #define RXF3SIDH 	0x10 // why not 0x0C?
+ #define RXF3SIDH 	0x10
  #define RXF3SIDL 	0x11
  #define RXF4SIDH 	0x14
  #define RXF4SIDL 	0x15
@@ -29,6 +29,5 @@
  // mask for RX buffer 1
  #define RXM1SIDH	0x24
  #define RXM1SIDL	0x25
-
 
  #endif
