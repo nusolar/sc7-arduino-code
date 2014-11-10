@@ -14,6 +14,7 @@ or Reset button will cause 2515 to error.
 #include "MCP2515_defs.h"
 
 Frame TXf, RXf;
+
 #define TEST_FID 0x101
 #define MODETX
 
@@ -51,23 +52,17 @@ void setup() {
     Serial.println("MCP2515 failed to set MODE");
     
   //Only enable RX interrupts for now
-  CCAN.Write(CANINTE,RX0IF|RX1IF);
+  CCAN.Write(CANINTE,RX0IF|RX1IF|TX0IF|TX1IF|TX2IF|MERRF);
   
-   /* Set up Transmit Frame
-   typedef struct
-  {
-        unsigned long id;      // EID if ide set, SID otherwise
-        byte srr;                  // Standard Frame Remote Transmit Request
-        byte rtr;                  // Remote Transmission Request
-        byte ide;                  // Extended ID flag
-        byte dlc;                  // Number of data bytes
-        byte data[8];            // Data bytes
-  } Frame; */
+  //Setup transmit frame
    TXf.id = TEST_FID;
+   TXf.ide = 0;
+   TXf.srr = 0;
+   TXf.rtr = 0;
    TXf.dlc = 8;
-   TXf.data[0] = 0;
-   TXf.data[1] = 1;
-   TXf.data[2] = 0;
+   TXf.data[0] = 9;
+   TXf.data[1] = 14;
+   TXf.data[2] = 3;
 }
 
 /************ TRANSMIT CODE ***********/
@@ -76,38 +71,25 @@ void loop() {
     // Send a Can Message
     CCAN.LoadBuffer(TXB0,TXf);
     CCAN.SendBuffer(TXB0);
-   /*
-    // Wait for a while to give MCP2515 time to process looped signal
-    delay(250);
-    while (CCAN.Interrupt() == false)
+    Serial.println(CCAN.Status(),BIN);
+    while (!CCAN.Interrupt())
+       if (millis()%2000 == 0)
+       {
+          Serial.println("Waiting for Sent Interrupt");
+          Serial.println(CCAN.Status(),BIN);
+       }
+    byte intr = CCAN.GetInterrupt();
+    if (intr & TX0IF)
     {
-      // Check for high interrupt pin
-      if (millis()%1000 == 0) 
-      {
-        Serial.print("Waiting for Message...");
-      }
+      Serial.println("Message Sent");
+      CCAN.ResetInterrupt(ALLIF);
     }
-    
-    // Read the INTF flags.
-    byte intf = CCAN.GetInterrupt();
-    Frame readframe;
-    readframe.data[0] = 3;
-    readframe.data[1] = 6;
-    if (intf & RX0IF) //if RX0 received
-       readframe = CCAN.ReadBuffer(RXB0);
-    if (intf & RX1IF) //if RX1 received
-       readframe = CCAN.ReadBuffer(RXB1);
-       
-    // Print data back on Serial
-    Serial.print("Messsage Received:");
-    Serial.print(readframe.data[0]);
-    Serial.println(readframe.data[1]);
-    
-    // Clear interrupts
-    CCAN.ResetInterrupt(RX0IF|RX1IF);
-    delay(1);
-    Serial.println(CCAN.GetInterrupt(),BIN);
-    */
+    else
+    {
+      Serial.println("Other Error");
+      Serial.println(intr,BIN);
+      Serial.println(CCAN.Read(TEC));
+    }
     
     delay(1000);
 }
@@ -123,11 +105,13 @@ void loop() {
       if (millis()%1000 == 0) 
       {
         Serial.print("Waiting for Message...");
+        Serial.println(CCAN.Status());
       }
     }
     
     // Read the INTF flags.
     byte intf = CCAN.GetInterrupt();
+    delay(10);
     Frame readframe;
     readframe.data[0] = 3;
     readframe.data[1] = 6;
@@ -142,8 +126,9 @@ void loop() {
     Serial.println(readframe.data[1]);
     
     // Clear interrupts
-    CCAN.ResetInterrupt(0xFFFFFF);
-    delay(1);
+    Serial.println(CCAN.GetInterrupt(),BIN);
+    CCAN.ResetInterrupt(ALLIF);
+    delay(10);
     Serial.println(CCAN.GetInterrupt(),BIN);
     Serial.println(CCAN.Read(EFLG),BIN);
     Serial.println(CCAN.Read(CANINTE),BIN);
