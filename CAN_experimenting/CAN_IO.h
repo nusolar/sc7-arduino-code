@@ -36,6 +36,7 @@ public:
 	static const uint16_t BUFFER_SIZE = 8; // RX queue size
         Frame buffer[BUFFER_SIZE]; // rx queue for frames
 	uint16_t buffer_index; // location of first unfilled buffer
+        bool messageavailable;
 
 	/*
 	 * Constructor. Creates a MCP2515 object using

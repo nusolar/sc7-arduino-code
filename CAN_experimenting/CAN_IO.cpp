@@ -8,7 +8,8 @@
 
 CAN_IO::CAN_IO(byte CS_pin, byte INT_pin): 
 	controller(CS_pin, INT_pin), 
-	buffer_index(0) {}
+	buffer_index(0),
+        messageavailable(false) {}
 
 void CAN_IO::setup(FilterInfo& filters) {
 	// SPI setup
@@ -79,14 +80,16 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	if (interrupt & RX1IF) { // receive buffer 1 full
 		if (buffer_index < BUFFER_SIZE) { // buffer space left
 			buffer[buffer_index] = controller.ReadBuffer(RXB1);
-			buffer_index++;
+			//buffer_index++;
+                        messageavailable = true;
 		}
 	}
 
 	if (interrupt & RX0IF) { // receive buffer 0 full
 		if (buffer_index < BUFFER_SIZE) { // buffer space left
 			buffer[buffer_index] = controller.ReadBuffer(RXB0);
-			buffer_index++;
+			//buffer_index++;
+                        messageavailable = true; 
 		}
 	}
 
