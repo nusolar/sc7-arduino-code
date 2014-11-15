@@ -11,11 +11,6 @@
 #include "DaveAK_can/MCP2515_defs.h"
 
 /*
- * Enum for state of the CAN bus.
- */
-enum CAN_State { Normal, Error };
-
-/*
  * Struct containing the filter info for the rx buffers.
  * Can specify mask and 2 filters for RXB0, and mask and
  * 5 filters for RXB1.
@@ -37,10 +32,9 @@ struct FilterInfo {
  */
 class CAN_IO {
 public:
-	const uint16_t BUFFER_SIZE = 8; // constant for the frame buffer size
-	Frame buffer[BUFFER_SIZE]; // frame buffer
+	const uint16_t RX_QUEUE_SIZE = 8; // constant for rx queue size
+	Frame buffer[RX_QUEUE_SIZE]; // rx queue for frames
 	uint16_t buffer_index; // location of first unfilled buffer
-	Can_State status; // status of the CAN interface
 
 	/*
 	 * Constructor. Creates a MCP2515 object using
@@ -59,7 +53,7 @@ public:
 	 * Invoked when the interrupt pin is pulled low. Handles
 	 * errors or reads messages, determined by the type of interrupt.
 	 */
-	void receive_CAN();
+	void receive_CAN(uint8_t& errflags);
 
 	/*
 	 * Sends messages to the CAN bus via the controller.

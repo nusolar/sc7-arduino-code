@@ -21,15 +21,16 @@ void CAN_IO::setup(FilterInfo& filters) {
 	int baudRate = controller.Init(125, 25);
 
 	if (baudRate <= 0) { // error
-		status = Error;
 	}
 
 	// return controller to config mode
 	bool success;
 	success = controller.Mode(MODE_CONFIG);
 	if (!success) { // error
-		status = Error;
 	}
+
+	// disable interrupts we don't care about
+	controller.Write(CANINTE, 0xA3); // 10100011
 
 	// config RX masks/filters
 	write_rx_filter(RXM0SIDH, filters.RXM0);
@@ -44,19 +45,15 @@ void CAN_IO::setup(FilterInfo& filters) {
 	// return controller to normal mode
 	success = controller.Mode(MODE_NORMAL);
 	if (!success) { // error
-		status = Error;
 	}
-
-	// how should errors be detected/handled?
-	// what else do we need to do?
 }
 
-void CAN_IO::receive_CAN() {
+void CAN_IO::receive_CAN(uint8_t& errflags) {
 	// read status of CANINTF register
 	byte interrupt = controller.GetInterrupts();
 
 	if (interrupt & MERRF) { // message error
-		status = Error;
+		errflags = 0x01; // this needs to be a real value!
 	}
 
 	if (interrupt & WAKIF) { // wake-up interrupt
@@ -64,7 +61,7 @@ void CAN_IO::receive_CAN() {
 	}
 
 	if (interrupt & ERRIF) { // error interrupt
-		status = Error;
+		errflags = 0x02; // this needs to be a real value!
 	}
 
 	if (interrupt & TX2IF) { // transmit buffer 2 empty
