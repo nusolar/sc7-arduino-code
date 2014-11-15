@@ -9,8 +9,8 @@
 
 // can vars
 CAN_IO can(CS_PIN, INT_PIN);
-DriveCmd drive_cmd;
-PowerCmd power_cmd;
+DC_Drive drive_cmd;
+DC_Power power_cmd;
 
 // state vars
 float motor_velocity;
@@ -42,8 +42,8 @@ void setup() {
 
 void loop() {
   // send drive and power packets
-  drive_cmd(motor_velocity, motor_current);
-  power_cmd(bus_current);
+  drive_cmd = DC_Drive(motor_velocity, motor_current);
+  power_cmd = DC_Power(bus_current);
   can.send_CAN(drive_cmd);
   can.send_CAN(power_cmd);
   

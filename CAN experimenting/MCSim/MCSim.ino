@@ -37,8 +37,8 @@ void loop() {
   car_velocity = motor_vel_percent/100.0f*MAX_VEL;
   
   // send heartbeat and velocity packets
-  mc_heartbeat(1,2);
-  mc_velocity(car_velocity, car_velocity);
+  mc_heartbeat = MC_Heartbeat(1,2);
+  mc_velocity = MC_Velocity(car_velocity, car_velocity);
   can.send_CAN(mc_heartbeat);
   can.send_CAN(mc_velocity);
   

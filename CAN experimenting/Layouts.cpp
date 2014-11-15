@@ -19,6 +19,50 @@ void Layout::set_header(Frame& f) {
 	f.srr = 0;
 }
 
+// Frame BMS_Heartbeat::generate_frame() {
+// 	Frame f;
+// 	f.low = device_id;
+// 	f.high = serial_no;
+// 	set_header(f);
+// 	return f;
+// }
+
+// Frame BMS_SOC::generate_frame() {
+// 	Frame f;
+// 	f.low = power_consumed;
+// 	f.high = percent_SOC;
+// 	set_hedaer(f);
+// 	return f;
+// }
+
+// Frame BMS_BalanceSOC::generate_frame() {
+// 	Frame f;
+// 	f.low = power_supplied;
+// 	f.high = SOC_mismatch;
+// 	set_header(f);
+// 	return f;
+// }
+
+// BMS_PrechargeStatus::BMS_PrechargeStatus(Frame& frame) {
+// 	id = frame.id;
+// 	driver_status = f.data[0];
+// 	timer_elapsed = f.data[6];
+// 	precharge_timer = f.data[7];
+// 	precharge_status = 0x0000 | (f.data[1] << 16) | (f.data[2] << 12) | (f.data[3] << 8) | (f.data[4] << 4) | f.data[5];
+// }
+
+// Frame BMS_PrechargeStatus::generate_frame() {
+// 	Frame f;
+// 	f.data[0] = driver_status;
+// 	f.data[1] = 0x000F & (precharge_status >> 16);
+// 	f.data[2] = 0x000F & (precharge_status >> 12);
+// 	f.data[3] = 0x000F & (precharge_status >> 8);
+// 	f.data[4] = 0x000F & (precharge_status >> 4);
+// 	f.data[5] = 0x000F & precharge_status;
+// 	f.data[6] = timer_elapsed;
+// 	f.data[7] = precharge_timer;
+// }
+
 Frame MC_Heartbeat::generate_frame() {
 	Frame f;
 	f.low = trituim_id;
@@ -27,13 +71,23 @@ Frame MC_Heartbeat::generate_frame() {
 	return f;
 }
 
-Frame MC_BusStatus::generate_frame() {
-	Frame f;
-	f.low = bus_current;
-	f.high = bus_voltage;
-	set_header(f);
-	return f;
-}
+// Frame MC_Status::generate_frame() {
+// 	Frame f;
+// 	f.s0 = 0;
+// 	f.s1 = active_motor;
+// 	f.s2 = err_flags;
+// 	f.s3 = limit_flags;
+// 	set_header(f);
+// 	return f;
+// }
+
+// Frame MC_BusStatus::generate_frame() {
+// 	Frame f;
+// 	f.low = bus_current;
+// 	f.high = bus_voltage;
+// 	set_header(f);
+// 	return f;
+// }
 
 Frame MC_Velocity::generate_frame() {
 	Frame f;
@@ -43,21 +97,21 @@ Frame MC_Velocity::generate_frame() {
 	return f;
 }
 
-Frame MC_PhaseCurrent::generate_frame() {
-	Frame f;
-	f.low = phase_a;
-	f.high = phase_b;
-	set_header(f);
-	return f;
-}
+// Frame MC_PhaseCurrent::generate_frame() {
+// 	Frame f;
+// 	f.low = phase_a;
+// 	f.high = phase_b;
+// 	set_header(f);
+// 	return f;
+// }
 
-Frame DC_Heartbeat::generate_frame() {
-	Frame f;
-	f.low = dc_id;
-	f.high = serial_no;
-	set_header(f);
-	return f;
-}
+// Frame DC_Heartbeat::generate_frame() {
+// 	Frame f;
+// 	f.low = dc_id;
+// 	f.high = serial_no;
+// 	set_header(f);
+// 	return f;
+// }
 
 Frame DC_Drive::generate_frame() {
 	Frame f;
@@ -75,17 +129,17 @@ Frame DC_Power::generate_frame() {
 	return f;
 }
 
-Frame DC_Reset::generate_frame() {
-	Frame f;
-	f.low = 0;
-	f.high = 0;
-	set_header(f);
-	return f;
-}
+// Frame DC_Reset::generate_frame() {
+// 	Frame f;
+// 	f.low = 0;
+// 	f.high = 0;
+// 	set_header(f);
+// 	return f;
+// }
 
-Frame DC_SwitchPos::generate_frame() {
-	Frame f;
-	f.data = is_run ? 0x0020 : 0x0040;
-	set_header(f);
-	return f;
-}
+// Frame DC_SwitchPos::generate_frame() {
+// 	Frame f;
+// 	f.data = is_run ? 0x0020 : 0x0040;
+// 	set_header(f);
+// 	return f;
+// }
