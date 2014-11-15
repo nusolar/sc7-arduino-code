@@ -2,10 +2,11 @@
  * CAN_test.cpp
  * Tests for CAN_IO lib.
  */
+/* NOT USING FOR ARDUINO COMPILING
 
 #include <iostream>
 #include <bitset>
-#include <cstdint>
+#include <stdint.h>
 
 using namespace std;
 
@@ -42,3 +43,4 @@ int main() {
 
 	return 0;
 }
+*/

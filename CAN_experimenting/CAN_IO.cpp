@@ -4,10 +4,10 @@
  */
 
 #include "CAN_IO.h"
+#include <SPI.h>
 
 CAN_IO::CAN_IO(byte CS_pin, byte INT_pin): 
 	controller(CS_pin, INT_pin), 
-	status(Normal),
 	buffer_index(0) {}
 
 void CAN_IO::setup(FilterInfo& filters) {
@@ -50,7 +50,7 @@ void CAN_IO::setup(FilterInfo& filters) {
 
 void CAN_IO::receive_CAN(uint8_t& errflags) {
 	// read status of CANINTF register
-	byte interrupt = controller.GetInterrupts();
+	byte interrupt = controller.GetInterrupt();
 
 	if (interrupt & MERRF) { // message error
 		errflags = 0x01; // this needs to be a real value!
@@ -91,12 +91,12 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	// clear interrupt
-	controller.ResetInterrupts(0xFF); // reset all interrupts
+	controller.ResetInterrupt(0xFF); // reset all interrupts
 }
 
 void CAN_IO::send_CAN(Layout& layout) {
-	LoadBuffer(TXB0, layout.generate_frame());
-	SendBuffer(TXB0);
+	controller.LoadBuffer(TXB0, layout.generate_frame());
+	controller.SendBuffer(TXB0);
 }
 
 void CAN_IO::write_rx_filter(uint8_t address, uint16_t data) {

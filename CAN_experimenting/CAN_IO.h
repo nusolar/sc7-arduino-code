@@ -6,9 +6,10 @@
 #ifndef CAN_IO_h
 #define CAN_IO_h
 
-#include <cstdint>
-#include "DaveAK_can/MCP2515.h"
-#include "DaveAK_can/MCP2515_defs.h"
+#include <stdint.h>
+#include "MCP2515.h"
+#include "MCP2515_defs.h"
+#include "Layouts.h"
 
 /*
  * Struct containing the filter info for the rx buffers.
@@ -32,8 +33,8 @@ struct FilterInfo {
  */
 class CAN_IO {
 public:
-	const uint16_t RX_QUEUE_SIZE = 8; // constant for rx queue size
-	Frame buffer[RX_QUEUE_SIZE]; // rx queue for frames
+	static const uint16_t BUFFER_SIZE = 8; // RX queue size
+        Frame buffer[BUFFER_SIZE]; // rx queue for frames
 	uint16_t buffer_index; // location of first unfilled buffer
 
 	/*
@@ -67,7 +68,7 @@ private:
 	 * If first is true, sets the mask/filter for the first buffer;
 	 * otherwise sets the second.
 	 */
-	void write_rx_filter(uint16_t mask, uint16_t filter, bool first);
+	void write_rx_filter(uint8_t address, uint16_t);
 
 	/*
 	 * Given a 12-bit mask/filter with bits 0 1 2 ... 11,

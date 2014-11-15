@@ -6,7 +6,7 @@
 #ifndef Layouts_h
 #define Layouts_h
 
-#include <cstdint>
+#include <stdint.h>
 #include "PacketIDs.h"
 #include "MCP2515_defs.h"
 
@@ -167,7 +167,7 @@ public:
 /*
  * Driver controls heartbeat packet.
  */
-class DC_Heartbeat : public Layout {
+ //class DC_Heartbeat : public Layout {
 // public:
 // 	DC_Heartbeat(uint32_t d_id, uint32_t s_no) : dc_id (d_id), serial_no (s_no) { id = DC_HEARTBEAT_ID; }
 // 	DC_Heartbeat(Frame& frame) : dc_id(fame.low), serial_no(frame.high) { id = frame.id }

@@ -2,9 +2,10 @@
  * LayoutTest.cpp
  * Test for layouts.
  */
-
+#ifndef COMPILE_ARDUINO // Don't use if we're compiling for the Arduino
+/*
 #include <iostream>
-#include <cstdint>
+#include <stdint.h>
 #include <bitset>
 
 #include "Layouts.h"
@@ -55,3 +56,5 @@ int main() {
 
 	return 0;
 }
+*/
+#endif
