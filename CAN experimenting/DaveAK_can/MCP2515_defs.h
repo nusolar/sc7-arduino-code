@@ -14,7 +14,6 @@
 #ifndef MCP2515_defs_h
 #define MCP2515_defs_h
 
-#include <cstdint>
 #include "Arduino.h"
 
 typedef struct
@@ -24,24 +23,7 @@ typedef struct
       byte rtr;                  // Remote Transmission Request
       byte ide;                  // Extended ID flag
       byte dlc;                  // Number of data bytes
-      union {
-        // 8 bytes
-        uint64_t value;
-        // 4 bytes
-        struct {
-          uint32_t low;
-          uint32_t high;
-        };
-        // 2 bytes
-        struct {
-          uint16_t s0;
-          uint16_t s1;
-          uint16_t s2;
-          uint16_t s3;
-        };
-        // 1 byte
-        uint8_t data[8];
-      };
+      byte data[8];            // Data bytes
 } Frame;
       
 
@@ -60,8 +42,8 @@ typedef struct
 // CANSTAT
 #define MODE_CONFIG            0x80
 #define MODE_LISTEN            0x60
-#define MODE_LOOPBACK          0x40
-#define MODE_SLEEP             0x20
+#define MODE_LOOPBACK      0x40
+#define MODE_SLEEP            0x20
 #define MODE_NORMAL            0x00
 // CANINTF
 #define RX0IF                  0x01
@@ -72,6 +54,7 @@ typedef struct
 #define ERRIF                  0x20
 #define WAKIF                  0x40
 #define MERRF                  0x80
+#define ALLIF                  0xFF
 
 // Configuration Registers
 #define CANSTAT         0x0E
@@ -179,25 +162,5 @@ typedef struct
 #define RXB0Full        0x01;
 #define RXB1Full        0x02;
 #define RXB_All                  RXB1Full | RXB2Full
-
-// filters for RX buffers (0-1 -> RXB0, 2-5 -> RXB1)
-#define RXF0SIDH   0x00
-#define RXF0SIDL   0x01
-#define RXF1SIDH   0x04
-#define RXF1SIDL   0x05
-#define RXF2SIDH   0x08
-#define RXF2SIDL   0x09
-#define RXF3SIDH   0x10
-#define RXF3SIDL   0x11
-#define RXF4SIDH   0x14
-#define RXF4SIDL   0x15
-#define RXF5SIDH   0x18
-#define RXF5SIDL   0x19
-
-// masks for RX buffers
-#define RXM0SIDH 0x20
-#define RXM0SIDL 0x21
-#define RXM1SIDH 0x24
-#define RXM1SIDL 0x25
 
 #endif

@@ -16,7 +16,7 @@ or Reset button will cause 2515 to error.
 Frame TXf, RXf;
 
 #define TEST_FID 0x101
-#define MODETX
+#define MODERX // Set to either MODERX or MODETX to compile for the TX or RX board for this test.
 
 /*
 typedef struct
@@ -41,20 +41,20 @@ void setup() {
   
   // put your setup code here, to run once:
   Serial.begin(9600);
-  while(Serial.read() != '1') ;
+  // Initialize the MCP2515
   if (CCAN.Init(125,20) == false)
     Serial.println("MCP2515 Failed to Initialize");
   
-  // Place chip in Loopback mode
+  // Place chip in Normal mode
   if (CCAN.Mode(MODE_NORMAL) == true)
     Serial.println("MCP2515 in NORMAL MODE");
   else
     Serial.println("MCP2515 failed to set MODE");
     
-  //Only enable RX interrupts for now
+  // Only enable RX interrupts for now
   CCAN.Write(CANINTE,RX0IF|RX1IF|TX0IF|TX1IF|TX2IF|MERRF);
   
-  //Setup transmit frame
+  // Setup transmit frame
    TXf.id = TEST_FID;
    TXf.ide = 0;
    TXf.srr = 0;
@@ -71,16 +71,18 @@ void loop() {
     // Send a Can Message
     CCAN.LoadBuffer(TXB0,TXf);
     CCAN.SendBuffer(TXB0);
+    //
+    Serial.print("2515 Status:");
     Serial.println(CCAN.Status(),BIN);
     while (!CCAN.Interrupt())
     {
       int lastmills;
        if (millis() - lastmills > 2000)
        {
-          Serial.println("Waiting for Sent Interrupt");
+          Serial.println("Waiting for Sent Interrupt (STATUS, TXB0CTRL)");      
           Serial.println(CCAN.Status(),BIN);
           Serial.println(CCAN.Read(TXB0CTRL),BIN);
-          lastmills = millis()
+          lastmills = millis();
         }
        delay(100);
     }
@@ -94,7 +96,6 @@ void loop() {
     {
       Serial.println("Other Error");
       Serial.println(intr,BIN);
-      Serial.println(CCAN.Read(TEC));
     }
     
     delay(1000);
@@ -130,14 +131,7 @@ void loop() {
     Serial.print("Messsage Received:");
     Serial.print(readframe.data[0]);
     Serial.println(readframe.data[1]);
-    
-    // Clear interrupts
-    Serial.println(CCAN.GetInterrupt(),BIN);
-    CCAN.ResetInterrupt(ALLIF);
-    delay(10);
-    Serial.println(CCAN.GetInterrupt(),BIN);
-    Serial.println(CCAN.Read(EFLG),BIN);
-    Serial.println(CCAN.Read(CANINTE),BIN);
+  
     delay(500);
 }
 #endif
