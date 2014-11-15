@@ -73,11 +73,17 @@ void loop() {
     CCAN.SendBuffer(TXB0);
     Serial.println(CCAN.Status(),BIN);
     while (!CCAN.Interrupt())
-       if (millis()%2000 == 0)
+    {
+      int lastmills;
+       if (millis() - lastmills > 2000)
        {
           Serial.println("Waiting for Sent Interrupt");
           Serial.println(CCAN.Status(),BIN);
-       }
+          Serial.println(CCAN.Read(TXB0CTRL),BIN);
+          lastmills = millis()
+        }
+       delay(100);
+    }
     byte intr = CCAN.GetInterrupt();
     if (intr & TX0IF)
     {
