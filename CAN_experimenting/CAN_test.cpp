@@ -2,28 +2,24 @@
  * CAN_test.cpp
  * Tests for CAN_IO lib.
  */
+/* NOT USING FOR ARDUINO COMPILING
 
 #include <iostream>
 #include <bitset>
+#include <stdint.h>
 
-using std::cout;
-using std::cin;
-using std::endl;
+using namespace std;
 
-typedef unsigned int byte; // won't compile with byte
-
-// These need to be tested, but I believe they should work
-byte CAN_IO::first_byte(unsigned int value) {
-	return (value >> 4) & 0xFF; // Shift value over and return the top 8 bits.
+uint8_t first_byte(unsigned int value) {
+	return (value >> 3) & 0x00FF;
 }
 
-byte CAN_IO::second_byte(unsigned int value) {
-	return (value << 4) & 0xF0; // Return the bottom 4 bits of value, in the MSB position
+uint8_t second_byte(unsigned int value) {
+	return (value << 5) & 0x00E0;
 }
 
 int main() {
-	bool done = false;
-	int value, first, second;
+	uint16_t value, first, second;
 	std::bitset<12> value_bits;
 	std::bitset<8> first_bits, second_bits;
 	char response = 'y';
@@ -45,3 +41,4 @@ int main() {
 
 	return 0;
 }
+*/
