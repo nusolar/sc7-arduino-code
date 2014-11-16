@@ -4,7 +4,7 @@
 #include "CAN_IO.h"
 
 CAN_IO can(4,5);
-FilterInfo filters {0,0, 0,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
+FilterInfo filters {0xFF8,0, DC_DRIVE_ID,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
 
 void setup()
 {
@@ -17,7 +17,9 @@ void setup()
 void loop()
 {
   DC_Drive packet(40,5); // Create drive command, vel = 40, cur = 5;
+  DC_Power packet2(30); // Create power command
   can.send_CAN(packet);
+  can.send_CAN(packet2);
   delay(500);
 }*/
 
