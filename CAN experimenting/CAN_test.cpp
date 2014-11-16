@@ -12,14 +12,13 @@ using std::endl;
 
 typedef unsigned int byte; // won't compile with byte
 
-byte first_byte(unsigned int value) {
-	return (value - (value % 16)) / 16;
-	// how does conversion to byte happen?
+// These need to be tested, but I believe they should work
+byte CAN_IO::first_byte(unsigned int value) {
+	return (value >> 4) & 0xFF; // Shift value over and return the top 8 bits.
 }
 
-byte second_byte(unsigned int value) {
-	return (value % 16) * 16;
-	// how does conversion to byte happen?
+byte CAN_IO::second_byte(unsigned int value) {
+	return (value << 4) & 0xF0; // Return the bottom 4 bits of value, in the MSB position
 }
 
 int main() {

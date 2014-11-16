@@ -10,6 +10,9 @@
 #include "DaveAK_can/MCP2515_defs.h"
 #include "MCP2515_defs_extended.h"
 
+#define CANCS 	4 // CAN Chip select pin
+#define CANINT 	5 // CAN Interrupt pin
+
 /*
  * Class for handling CAN I/O operations using the
  * MCP2515 CAN controller.
