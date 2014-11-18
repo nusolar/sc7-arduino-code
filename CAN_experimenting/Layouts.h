@@ -48,7 +48,7 @@ public:
 class BMS_SOC : public Layout {
 public:
 	BMS_SOC(uint32_t pow_cons, uint32_t per_SOC) : power_consumed(pow_cons), percent_SOC(per_SOC) { id = BMS_SOC_ID; }
-	BMS_SOC(Frame& frame) : power_consumed(f.low), percent_SOC(f.high) { id = frame.id; }
+	BMS_SOC(Frame& frame) : power_consumed(frame.low), percent_SOC(frame.high) { id = frame.id; }
 
 	Frame generate_frame();
 
@@ -78,14 +78,20 @@ public:
 class BMS_PrechargeStatus : public Layout {
 public:
 	BMS_PrechargeStatus(uint8_t d_status, uint64_t pc_status, uint8_t t_elapsed, uint8_t pc_timer) :
-		driver_status(d_status), precharge_state(pc_status), timer_elapsed(t_elapsed), precharge_timer(pc_timer)
+		driver_status(d_status), precharge_status(pc_status), timer_elapsed(t_elapsed), precharge_timer(pc_timer)
 		{ id = BMS_PRECHARGE_ID; }
-	BMS_PrechargeStatus(Frame& frame);
+	BMS_PrechargeStatus(Frame& frame) {
+	id = frame.id;
+	driver_status = frame.data[0];
+	timer_elapsed = frame.data[6];
+	precharge_timer = frame.data[7];
+	precharge_status = 0x0000 | (frame.data[1] << 16) | (frame.data[2] << 12) | (frame.data[3] << 8) | (frame.data[4] << 4) | frame.data[5];
+}
 
 	Frame generate_frame();
 
 	uint8_t driver_status;
-	uint64_t precharge_state;
+	uint64_t precharge_status;
 	uint8_t timer_elapsed;
 	uint8_t precharge_timer;
 };
@@ -110,10 +116,10 @@ public:
 class BMS_Status : public Layout {
 public:
 	BMS_Status(uint16_t v_rising, uint16_t v_falling, uint8_t flg, uint8_t cmus, uint16_t firmware) :
-		voltage_rising(v_rising), voltage_falling(v_falling), flags(flg), no_cmus(cmus), firware_build(firmware)
+		voltage_rising(v_rising), voltage_falling(v_falling), flags(flg), no_cmus(cmus), firmware_build(firmware)
 		{ id = BMS_STATUS_ID; }
 	BMS_Status(Frame& frame) : voltage_rising(frame.s0), voltage_falling(frame.s1), 
-		flags(frame.data[4]), no_cmus(frame.data[5]), firmware_build(f.s3)
+		flags(frame.data[4]), no_cmus(frame.data[5]), firmware_build(frame.s3)
 		{ id = frame.id; }
 
 	Frame generate_frame();
@@ -233,7 +239,7 @@ public:
 class DC_Heartbeat : public Layout {
 public:
 	DC_Heartbeat(uint32_t d_id, uint32_t s_no) : dc_id (d_id), serial_no (s_no) { id = DC_HEARTBEAT_ID; }
-	DC_Heartbeat(Frame& frame) : dc_id(fame.low), serial_no(frame.high) { id = frame.id }
+	DC_Heartbeat(Frame& frame) : dc_id(frame.low), serial_no(frame.high) { id = frame.id; }
 
 	Frame generate_frame();
 
@@ -274,7 +280,7 @@ public:
 class DC_Reset : public Layout {
 public:
 	DC_Reset() { id = DC_RESET_ID; }
-	DC_Reset(Frame& frame) : { id = frame.id }
+	DC_Reset(Frame& frame) { id = frame.id; }
 
 	Frame generate_frame();
 };
@@ -285,9 +291,11 @@ public:
 class DC_SwitchPos : public Layout {
 public:
 	DC_SwitchPos(bool run) : is_run(run) { id = DC_SWITCHPOS_ID; }
-	DC_SwitchPos(Frame& frame) : is_run(frame.data == 0x0020) { id = frame.id; }
+	DC_SwitchPos(Frame& frame) : is_run((frame.low == 0x0020)) { id = frame.id; }
 
 	bool is_run;
+
+        Frame generate_frame();
 };
 
 #endif

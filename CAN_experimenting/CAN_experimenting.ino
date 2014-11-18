@@ -39,6 +39,8 @@ void loop()
   else
   {
     Serial.println("NO MESSAGE");
+    Serial.println(errors,BIN);
+    delay(500);
   }
 }
   
