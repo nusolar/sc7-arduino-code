@@ -13,17 +13,18 @@ void setup()
   
 }
 
-/* For TX
+/* For TX*/
 void loop()
 {
   DC_Drive packet(40,5); // Create drive command, vel = 40, cur = 5;
   DC_Power packet2(30); // Create power command
   can.send_CAN(packet);
+  delay(500);
   can.send_CAN(packet2);
   delay(500);
-}*/
+}
 
-/* For RX*/
+/* For RX
 void loop()
 {
   byte errors = 0x0000;
@@ -36,13 +37,14 @@ void loop()
     DC_Drive packet(can.buffer[can.buffer_index]); //Get the drive packet
     Serial.println(packet.velocity);
     Serial.println(packet.current);
-    delay(500);
+    Serial.println(packet.id);
+    delay(250);
   }
   else
   {
     Serial.println("NO MESSAGE");
     Serial.println(errors,BIN);
-    delay(500);
+    delay(250);
   }
-}
+}*/
   
