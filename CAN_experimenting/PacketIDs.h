@@ -30,4 +30,9 @@
 #define DC_RESET_ID			0x503
 #define DC_SWITCHPOS_ID		0x505
 
+#define MASK_SID			0x7FF
+#define MASK_EID			0x7FFFF
+#define MASK_NONE			0x000
+ 
+
 #endif
