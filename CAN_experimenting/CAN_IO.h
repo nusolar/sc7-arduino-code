@@ -61,8 +61,14 @@ public:
 	 * Sends messages to the CAN bus via the controller.
 	 */
 	void send_CAN(Layout& layout);
+        
+        // Will be used to set up receive filters in a cleaner way.
+        /*void set_RB1_filters(uint16_t mask,uint16_t filter,uint16_t filter);
+        void set_RB0_filters(uint16_tmask, uint16_t f1, uint16_t filter, uint16_t filter, uint16_t filter);*/
+        
+        
+        MCP2515 controller;
 private:
-	MCP2515 controller;
 
 	/*
 	 * Helper function for configuring the RX masks/filters.

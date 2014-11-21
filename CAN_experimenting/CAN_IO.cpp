@@ -41,7 +41,7 @@ void CAN_IO::setup(FilterInfo& filters) {
 	write_rx_filter(RXF2SIDH, filters.RXF2);
 	write_rx_filter(RXF3SIDH, filters.RXF3);
 	write_rx_filter(RXF4SIDH, filters.RXF4);
-	write_rx_filter(RXF5SIDH, filters.RXF5);
+	write_rx_filter(RXF5SIDH, filters.RXF5); 
 
 	// return controller to normal mode
 	success = controller.Mode(MODE_NORMAL);
@@ -112,5 +112,5 @@ uint8_t CAN_IO::first_byte(uint16_t value) {
 }
 
 uint8_t CAN_IO::second_byte(uint16_t value) {
-	return (value << 5) & 0x0070;
+	return (value << 5) & 0x00E0;
 }
