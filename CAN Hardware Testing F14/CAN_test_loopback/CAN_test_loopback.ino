@@ -40,7 +40,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   while(Serial.read() != '1') ;
-  Serial.write(CCAN.Init(125,20) + '0');
+  Serial.write(CCAN.Init(1000,16) + '0');
   f.id=0x011;
   f.srr = 0;
   f.rtr = 0;

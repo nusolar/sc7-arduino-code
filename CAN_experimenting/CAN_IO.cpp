@@ -11,7 +11,7 @@ CAN_IO::CAN_IO(byte CS_pin, byte INT_pin):
 	buffer_index(0),
         messageavailable(false) {}
 
-void CAN_IO::setup(FilterInfo& filters) {
+void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	// SPI setup
 	SPI.setClockDivider(10);
   	SPI.setDataMode(SPI_MODE0);
@@ -19,15 +19,17 @@ void CAN_IO::setup(FilterInfo& filters) {
   	SPI.begin();
   	
 	// init the controller
-	int baudRate = controller.Init(125, 25);
+	int baudRate = controller.Init(1000, 25);
 
 	if (baudRate <= 0) { // error
+            errors |= 0x04;
 	}
 
 	// return controller to config mode
 	bool success;
 	success = controller.Mode(MODE_CONFIG);
 	if (!success) { // error
+            errors |= 0x08;
 	}
 
 	// disable interrupts we don't care about
@@ -54,7 +56,7 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	byte interrupt = controller.GetInterrupt();
 
 	if (interrupt & MERRF) { // message error
-		errflags = 0x01; // this needs to be a real value!
+		errflags |= 0x01; // this needs to be a real value!
 	}
 
 	if (interrupt & WAKIF) { // wake-up interrupt
@@ -62,7 +64,7 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	if (interrupt & ERRIF) { // error interrupt
-		errflags = 0x02; // this needs to be a real value!
+		errflags |= 0x02; // this needs to be a real value!
 	}
 
 	if (interrupt & TX2IF) { // transmit buffer 2 empty

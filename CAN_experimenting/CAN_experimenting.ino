@@ -4,12 +4,14 @@
 #include "CAN_IO.h"
 
 CAN_IO can(4,5);
-FilterInfo filters {0x0FF0,0x0FFF, 0x501,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
+FilterInfo filters {0xFF0,0xFFF, 0x500,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
+byte errors = 0;
 
 void setup()
 {
   Serial.begin(9600);
-  can.setup(filters);
+  can.setup(filters, errors);
+  Serial.println(errors, BIN);
   
   // Read Filter bits for RB0 to make sure that they are correct.
 }
@@ -23,12 +25,17 @@ void loop()
   delay(500);
   can.send_CAN(packet2);
   delay(500);
+  Serial.print("TEC: ");
+  Serial.println(can.controller.Read(TEC), BIN);
+  Serial.print("REC: ");
+  Serial.println(can.controller.Read(REC), BIN);
+  Serial.print("EFLG: ");
+  Serial.println(can.controller.Read(EFLG), BIN);
 }*/
 
 /* For RX*/
 void loop()
 {
-  byte errors = 0x0000;
   if (digitalRead(5) == LOW)
   {
      Serial.println(can.controller.RXStatus(),BIN);
@@ -47,7 +54,14 @@ void loop()
   else
   {
     Serial.println("NO MESSAGE");
+    Serial.print("errors: ");
     Serial.println(errors,BIN);
+    Serial.print("TEC: ");
+    Serial.println(can.controller.Read(TEC), BIN);
+    Serial.print("REC: ");
+    Serial.println(can.controller.Read(REC), BIN);
+    Serial.print("EFLG: ");
+    Serial.println(can.controller.Read(EFLG), BIN);
     delay(250);
   }
 }
