@@ -1,8 +1,9 @@
-/* LOOPBACK TEST FOR ARDUINO-MCP2515 CAN TXRX
+/* 2-board TEST FOR ARDUINO-MCP2515 CAN TXRX
 - Alexander Martin, Fall 2014 -
-This code puts the MCP2515 in Loopback Mode, where the TX and RX pins are
-internally connected. 5 and 10 are sent in data[0] and data[1] bytes in a
-CAN frame and received/printed upon reception.
+This code implements basic TX and RX functions for the MCP2515 on the Arduino Due.
+It includes one setup routine and two loop routines, on loop for RX and one for TX.
+Switching between TX code and RX code can be done by setting the #define below to either
+MODERX or MODETX.
 
 NOTE: Will only work fresh after a power cycle. Reseting the Arduino w/ Serial
 or Reset button will cause 2515 to error.
@@ -16,7 +17,7 @@ or Reset button will cause 2515 to error.
 Frame TXf, RXf;
 
 #define TEST_FID 0x101
-#define MODERX // Set to either MODERX or MODETX to compile for the TX or RX board for this test.
+#define MODETX // Set to either MODERX or MODETX to compile for the TX or RX board for this test.
 
 /*
 typedef struct
@@ -42,7 +43,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   // Initialize the MCP2515
-  if (CCAN.Init(125,20) == false)
+  if (CCAN.Init(1000,16) == false)
     Serial.println("MCP2515 Failed to Initialize");
   
   // Place chip in Normal mode
@@ -126,11 +127,18 @@ void loop() {
        readframe = CCAN.ReadBuffer(RXB0);
     if (intf & RX1IF) //if RX1 received
        readframe = CCAN.ReadBuffer(RXB1);
-       
-    // Print data back on Serial
-    Serial.print("Messsage Received:");
-    Serial.print(readframe.data[0]);
-    Serial.println(readframe.data[1]);
+    if (intf & MERRF)
+    {
+        Serial.println("Message Error");
+    }
+    else
+    {
+      // Print data back on Serial
+      Serial.print("Messsage Received:");
+      Serial.print(readframe.data[0]);
+      Serial.print(readframe.data[1]);
+      Serial.println(readframe.data[2]);
+    }
   
     delay(500);
 }

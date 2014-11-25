@@ -1,10 +1,12 @@
+/* TODO Documentation for this file */
 #define COMPILE_ARDUINO
+#define MODERX
 
 #include <SPI.h>
 #include "CAN_IO.h"
 
 CAN_IO can(4,5);
-FilterInfo filters {0xFF0,0xFFF, 0x500,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
+FilterInfo filters {0xFFF,0xFFF, DC_DRIVE_ID,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
 byte errors = 0;
 
 void setup()
@@ -16,7 +18,8 @@ void setup()
   // Read Filter bits for RB0 to make sure that they are correct.
 }
 
-/* For TX
+/* For TX*/
+#ifdef MODETX
 void loop()
 {
   DC_Drive packet(40,5); // Create drive command, vel = 40, cur = 5;
@@ -31,9 +34,11 @@ void loop()
   Serial.println(can.controller.Read(REC), BIN);
   Serial.print("EFLG: ");
   Serial.println(can.controller.Read(EFLG), BIN);
-}*/
+}
+#endif
 
-/* For RX*/
+/* For RX */
+#ifdef MODERX
 void loop()
 {
   if (digitalRead(5) == LOW)
@@ -56,13 +61,14 @@ void loop()
     Serial.println("NO MESSAGE");
     Serial.print("errors: ");
     Serial.println(errors,BIN);
-    Serial.print("TEC: ");
+    /*Serial.print("TEC: ");
     Serial.println(can.controller.Read(TEC), BIN);
     Serial.print("REC: ");
     Serial.println(can.controller.Read(REC), BIN);
     Serial.print("EFLG: ");
-    Serial.println(can.controller.Read(EFLG), BIN);
+    Serial.println(can.controller.Read(EFLG), BIN);*/
     delay(250);
   }
 }
+#endif
   

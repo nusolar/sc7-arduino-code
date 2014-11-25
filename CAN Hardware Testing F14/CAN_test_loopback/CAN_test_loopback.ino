@@ -40,7 +40,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   while(Serial.read() != '1') ;
-  Serial.write(CCAN.Init(1000,16) + '0');
+  Serial.write(CCAN.Init(125,16) + '0');
   f.id=0x011;
   f.srr = 0;
   f.rtr = 0;
@@ -50,7 +50,7 @@ void setup() {
   f.data[1] = 10;
   
   // Place chip in Loopback mode
-  Serial.write(CCAN.Mode(MODE_LOOPBACK)+'0');
+  Serial.write(CCAN.Mode(MODE_NORMAL)+'0');
   Serial.print((byte)CCAN.Read(CANSTAT));
 }
 
@@ -60,15 +60,15 @@ void loop() {
     CCAN.SendBuffer(TXB0);
    
     // Wait for a while to give MCP2515 time to process looped signal
-    delay(250);
-    while (CCAN.Interrupt() == false)
+    delay(1);
+    /*while (CCAN.Interrupt() == false)
     {
       // Check for high interrupt pin
       if (millis()%1000 == 0) 
       {
         Serial.print("Waiting for Message...");
       }
-    }
+    }*/
     
     // Read the INTF flags.
     byte intf = CCAN.GetInterrupt();
