@@ -10,6 +10,7 @@
 #include "MCP2515.h"
 #include "MCP2515_defs.h"
 #include "Layouts.h"
+#include "RX_Queue.h"
 
 /*
  * Struct containing the filter info for the rx buffers.
@@ -33,10 +34,7 @@ struct FilterInfo {
  */
 class CAN_IO {
 public:
-	static const uint16_t BUFFER_SIZE = 8; // RX queue size
-        Frame buffer[BUFFER_SIZE]; // rx queue for frames
-	uint16_t buffer_index; // location of first unfilled buffer
-        bool messageavailable;
+	RX_Deque buffer;
 
 	/*
 	 * Constructor. Creates a MCP2515 object using
@@ -65,9 +63,16 @@ public:
         // Will be used to set up receive filters in a cleaner way.
         /*void set_RB1_filters(uint16_t mask,uint16_t filter,uint16_t filter);
         void set_RB0_filters(uint16_tmask, uint16_t f1, uint16_t filter, uint16_t filter, uint16_t filter);*/
+      
+	/*
+	 * Returns true if the RX buffer is not empty.
+	 */
+	bool messageExists()
+	{
+		return !buffer.is_empty();
+	}
         
-        
-        MCP2515 controller;
+    MCP2515 controller;
 private:
 
 	/*

@@ -1,6 +1,6 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
-#define MODETX
+#define MODERX
 
 #include <SPI.h>
 #include "CAN_IO.h"
@@ -25,16 +25,16 @@ void setup()
   Serial.println(errors, BIN);
   
   /* Queue Testing Code -- Works 11/26/14 */
-  RX_Queue testqueue;
+  RX_Deque testqueue;
   
   for (int i = 0; i < 10; i++)
   {
-	  testqueue.enqueue(DC_Drive(40,i).generate_frame());
+	  testqueue.enqueue_tail(DC_Drive(40,i).generate_frame());
   }
 
   for(int i = 0; !testqueue.is_empty(); i++)
   {
-    Serial.println(testqueue.dequeue().high);
+    Serial.println(testqueue.dequeue_head().high);
   }
   
 }
@@ -71,18 +71,15 @@ void loop()
 {
   if (digitalRead(5) == LOW)
   {
-     Serial.println(can.controller.RXStatus(),BIN);
      can.receive_CAN(errors); //Reads CAN data into buffer
      
   }
   
-  if (can.messageavailable) {
-    DC_Drive packet(can.buffer[can.buffer_index]); //Get the drive packet
-    Serial.println(packet.velocity);
-    Serial.println(packet.current);
-    Serial.println(packet.id,HEX);
+  if (can.messageExists()) {
+    DC_Drive packet(can.buffer.dequeue_tail()); //Get the drive packet
+	char str[50]; sprintf(str, "Id: %x, Vel: %d, Cur: %d,", packet.id, packet.velocity, packet.current);
+    Serial.println(str);
     delay(250);
-    can.messageavailable = false;
   }
   else
   {

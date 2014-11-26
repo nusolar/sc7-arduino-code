@@ -7,9 +7,7 @@
 #include <SPI.h>
 
 CAN_IO::CAN_IO(byte CS_pin, byte INT_pin): 
-	controller(CS_pin, INT_pin), 
-	buffer_index(0),
-        messageavailable(false) {}
+	controller(CS_pin, INT_pin) {}
 
 void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	// SPI setup
@@ -20,15 +18,12 @@ void CAN_IO::setup(FilterInfo& filters, byte errors) {
   	
 	// init the controller
 	int baudRate = controller.Init(1000, 25);
-
 	if (baudRate <= 0) { // error
             errors |= 0x04;
 	}
 
 	// return controller to config mode
-	bool success;
-	success = controller.Mode(MODE_CONFIG);
-	if (!success) { // error
+	if (!controller.Mode(MODE_CONFIG)) { // error
             errors |= 0x08;
 	}
 
@@ -46,8 +41,7 @@ void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	write_rx_filter(RXF5SIDH, filters.RXF5); 
 
 	// return controller to normal mode
-	success = controller.Mode(MODE_NORMAL);
-	if (!success) { // error
+	if (!controller.Mode(MODE_NORMAL)) { // error
 	}
 }
 
@@ -80,19 +74,11 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	if (interrupt & RX1IF) { // receive buffer 1 full
-		if (buffer_index < BUFFER_SIZE) { // buffer space left
-			buffer[buffer_index] = controller.ReadBuffer(RXB1);
-			//buffer_index++;
-                        messageavailable = true;
-		}
+			buffer.enqueue_head(controller.ReadBuffer(RXB1));
 	}
 
 	if (interrupt & RX0IF) { // receive buffer 0 full
-		if (buffer_index < BUFFER_SIZE) { // buffer space left
-			buffer[buffer_index] = controller.ReadBuffer(RXB0);
-			//buffer_index++;
-                        messageavailable = true; 
-		}
+			buffer.enqueue_head(controller.ReadBuffer(RXB0));
 	}
 
 	// clear interrupt

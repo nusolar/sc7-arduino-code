@@ -43,7 +43,7 @@ Frame BMS_BalanceSOC::generate_frame() {
 	return f;
 }
 
-//BMS_PrechargeStatus::BMS_PrechargeStatus(Frame& frame) 
+//BMS_PrechargeStatus::BMS_PrechargeStatus(const Frame& frame) 
 
 Frame BMS_PrechargeStatus::generate_frame() {
 	Frame f;
