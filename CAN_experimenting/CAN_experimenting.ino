@@ -1,13 +1,22 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
-#define MODERX
+#define MODETX
 
 #include <SPI.h>
 #include "CAN_IO.h"
+#include "RX_Queue.h"
+
+#define pedalPin A10
 
 CAN_IO can(4,5);
 FilterInfo filters {0xFFF,0xFFF, DC_DRIVE_ID,0,0,0,0,0}; //Set up masks and filters. All of them 0 for now.
 byte errors = 0;
+
+struct 
+{
+	uint16_t raw_pedal;
+	float current;
+} Status;
 
 void setup()
 {
@@ -15,25 +24,44 @@ void setup()
   can.setup(filters, errors);
   Serial.println(errors, BIN);
   
-  // Read Filter bits for RB0 to make sure that they are correct.
+  /* Queue Testing Code -- Works 11/26/14 */
+  RX_Queue testqueue;
+  
+  for (int i = 0; i < 10; i++)
+  {
+	  testqueue.enqueue(DC_Drive(40,i).generate_frame());
+  }
+
+  for(int i = 0; !testqueue.is_empty(); i++)
+  {
+    Serial.println(testqueue.dequeue().high);
+  }
+  
 }
 
 /* For TX*/
 #ifdef MODETX
 void loop()
 {
-  DC_Drive packet(40,5); // Create drive command, vel = 40, cur = 5;
+  read_ins();
+  DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
   DC_Power packet2(30); // Create power command
   can.send_CAN(packet);
-  delay(500);
+  delay(100);
   can.send_CAN(packet2);
-  delay(500);
-  Serial.print("TEC: ");
+  delay(100);
+  /*Serial.print("TEC: ");
   Serial.println(can.controller.Read(TEC), BIN);
   Serial.print("REC: ");
   Serial.println(can.controller.Read(REC), BIN);
   Serial.print("EFLG: ");
-  Serial.println(can.controller.Read(EFLG), BIN);
+  Serial.println(can.controller.Read(EFLG), BIN);*/
+}
+
+void read_ins()
+{
+	Status.raw_pedal = analogRead(pedalPin);
+	Status.current = Status.raw_pedal*100.0 / 750.0;
 }
 #endif
 
