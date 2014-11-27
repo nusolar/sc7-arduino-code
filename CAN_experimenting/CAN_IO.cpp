@@ -6,25 +6,25 @@
 #include "CAN_IO.h"
 #include <SPI.h>
 
-CAN_IO::CAN_IO(byte CS_pin, byte INT_pin): 
-	controller(CS_pin, INT_pin) {}
+CAN_IO::CAN_IO(byte CS_pin, byte INT_pin) :
+controller(CS_pin, INT_pin) {}
 
 void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	// SPI setup
 	SPI.setClockDivider(10);
-  	SPI.setDataMode(SPI_MODE0);
-  	SPI.setBitOrder(MSBFIRST);
-  	SPI.begin();
-  	
+	SPI.setDataMode(SPI_MODE0);
+	SPI.setBitOrder(MSBFIRST);
+	SPI.begin();
+
 	// init the controller
 	int baudRate = controller.Init(1000, 25);
 	if (baudRate <= 0) { // error
-            errors |= 0x04;
+		errors |= 0x04;
 	}
 
 	// return controller to config mode
 	if (!controller.Mode(MODE_CONFIG)) { // error
-            errors |= 0x08;
+		errors |= 0x08;
 	}
 
 	// disable interrupts we don't care about
@@ -38,7 +38,7 @@ void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	write_rx_filter(RXF2SIDH, filters.RXF2);
 	write_rx_filter(RXF3SIDH, filters.RXF3);
 	write_rx_filter(RXF4SIDH, filters.RXF4);
-	write_rx_filter(RXF5SIDH, filters.RXF5); 
+	write_rx_filter(RXF5SIDH, filters.RXF5);
 
 	// return controller to normal mode
 	if (!controller.Mode(MODE_NORMAL)) { // error
@@ -74,11 +74,11 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	if (interrupt & RX1IF) { // receive buffer 1 full
-			buffer.enqueue_head(controller.ReadBuffer(RXB1));
+		buffer.enqueue(controller.ReadBuffer(RXB1));
 	}
 
 	if (interrupt & RX0IF) { // receive buffer 0 full
-			buffer.enqueue_head(controller.ReadBuffer(RXB0));
+		buffer.enqueue(controller.ReadBuffer(RXB0));
 	}
 
 	// clear interrupt
@@ -91,7 +91,7 @@ void CAN_IO::send_CAN(Layout& layout) {
 }
 
 void CAN_IO::write_rx_filter(uint8_t address, uint16_t data) {
-	uint8_t bytes[2] = {first_byte(data), second_byte(data)};
+	uint8_t bytes[2] = { first_byte(data), second_byte(data) };
 	controller.Write(address, bytes, 2);
 }
 

@@ -239,7 +239,7 @@ public:
 class DC_Heartbeat : public Layout {
 public:
 	DC_Heartbeat(uint32_t d_id, uint32_t s_no) : dc_id (d_id), serial_no (s_no) { id = DC_HEARTBEAT_ID; }
-	DC_Heartbeat(const Frame& frame) : dc_id(frame.low), serial_no(frame.high) { id = frame.id; }
+	DC_Heartbeat(Frame& frame) : dc_id(frame.low), serial_no(frame.high) { id = frame.id; }
 
 	Frame generate_frame();
 

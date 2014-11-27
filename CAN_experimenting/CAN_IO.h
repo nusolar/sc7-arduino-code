@@ -34,7 +34,7 @@ struct FilterInfo {
  */
 class CAN_IO {
 public:
-	RX_Deque buffer;
+	RX_Queue<8> buffer;
 
 	/*
 	 * Constructor. Creates a MCP2515 object using
