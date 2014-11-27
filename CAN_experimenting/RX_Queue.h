@@ -103,9 +103,11 @@ private:
 	bool	isFull;
 };
 
+/* Frame Deque */
+template <int Tsize>
 class RX_Deque {
 public:
-	static const int RX_DEQUE_SIZE = 8;
+	static const int RX_DEQUE_SIZE = Tsize;
 
 	/*
 	 * Constructor. Initializes the deque.
@@ -139,22 +141,91 @@ public:
 	/*
 	 * Adds a frame at the head of the deque.
 	 */
-	void enqueue_head(const Frame& frame);
+	void enqueue_head(const Frame& f) {
+		if (!is_full()) {
+			buf[head++] = f;
+
+			// Wrap Head
+			if (head >= RX_DEQUE_SIZE) {
+				head = 0;
+			}
+
+			//Check whether full
+			if (head == tail) {
+				isFull = true;
+			}
+		}
+		else { // If full, we overwrite the last added message.
+			buf[(head + RX_DEQUE_SIZE - 1) % RX_DEQUE_SIZE] = f;
+		}
+	}
+
 
 	/*
 	 * Returns a frame from the head of the deque
 	 */
-	Frame dequeue_head();
+	Frame dequeue_head() {
+		if (!is_empty()) {
+			//Wrap head
+			if (head == 0) {
+				head = RX_DEQUE_SIZE;
+			}
+
+			uint8_t readloc = --head;
+
+			//Check whether queue has been emptied
+			if (tail == head) {
+				isFull = false;
+			}
+
+			return buf[readloc];
+		}
+		return Frame();
+	}
 
 	/*
 	 * Adds a frame at the tail of the deque.
 	 */
-	void enqueue_tail(const Frame& frame);
+	void enqueue_tail(const Frame& f) {
+		if (!is_full()) {
+			if (tail == 0) {
+				tail = RX_DEQUE_SIZE;
+			}
+
+			buf[--tail] = f;
+
+			//Check whether full
+			if (head == tail) {
+				isFull = true;
+			}
+		}
+		else { // If full, we overwrite the last added message.
+			buf[tail] = f;
+		}
+	}
 
 	/*
 	 * Returns a frame from the tail of the deque
 	 */
-	Frame dequeue_tail();
+	Frame dequeue_tail() {
+		if (!is_empty()) {
+			uint8_t readloc = tail++;
+
+			//Wrap tail
+			if (tail >= RX_DEQUE_SIZE) {
+				tail = 0;
+			}
+
+			//Check whether queue has been emptied
+			if (tail == head) {
+				isFull = false;
+			}
+
+			return buf[readloc];
+		}
+		return Frame();
+	}
+
 private:
 	Frame buf[RX_DEQUE_SIZE];
 	uint8_t head;

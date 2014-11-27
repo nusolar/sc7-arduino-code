@@ -6,7 +6,7 @@
 #include "RX_Queue.h"
 #include <stdint.h>
 
-//---------------------------------
+/*---------------------------------
 void RX_Deque::enqueue_head(const Frame& f) {
 	if (!is_full()) {
 		buf[head++] = f;
@@ -80,4 +80,4 @@ Frame RX_Deque::dequeue_head() {
 		return buf[readloc];
 	}
 	return Frame();
-}
+}*/

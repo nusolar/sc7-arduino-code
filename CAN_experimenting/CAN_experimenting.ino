@@ -25,7 +25,7 @@ void setup()
 	Serial.println(errors, BIN);
 
 	/* Queue Testing Code -- Works 11/26/14 */
-	RX_Deque testqueue;
+	RX_Deque<8> testqueue;
 
 	for (int i = 0; i < 10; i++)
 	{
