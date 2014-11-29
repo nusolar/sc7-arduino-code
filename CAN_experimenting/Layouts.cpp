@@ -4,6 +4,7 @@
  */
 
 #include "Layouts.h"
+#include "PacketIDs.h"
 
 Frame Layout::generate_frame() {
 	Frame f;
