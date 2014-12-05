@@ -72,6 +72,7 @@ typedef struct
 #define ERRIF                  0x20
 #define WAKIF                  0x40
 #define MERRF                  0x80
+#define INTALL                 0xFF
 
 // Configuration Registers
 #define CANSTAT         0x0E

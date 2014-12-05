@@ -9,8 +9,8 @@
 #define pedalPin A10
 
 CAN_IO can(4, 5);
-FilterInfo filters{ 0xFFF, 0xFFF, DC_DRIVE_ID, 0, 0, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
-byte errors = 0;
+FilterInfo filters{ 0xFFF, 0xFFF, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
+uint16_t errors = 0;
 
 struct
 {
@@ -21,22 +21,10 @@ struct
 void setup()
 {
 	Serial.begin(9600);
-	can.setup(filters, errors);
+        //filters.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
+        //filters.setRB1(MASK_Sxxx,BMS_HEARTBEAT_ID,0,0,0);
+        can.setup(filters, &errors, true);
 	Serial.println(errors, BIN);
-
-	/* Queue Testing Code -- Works 11/26/14 */
-	RX_Deque<8> testqueue;
-
-	for (int i = 0; i < 10; i++)
-	{
-		testqueue.enqueue_head(DC_Drive(40, i).generate_frame());
-	}
-
-	for (int i = 0; !testqueue.is_empty(); i++)
-	{
-		Serial.println(testqueue.dequeue_head().high);
-	}
-
 }
 
 /* For TX*/
@@ -45,7 +33,7 @@ void loop()
 {
 	read_ins();
 	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
-	DC_Power packet2(30); // Create power command
+	BMS_Heartbeat packet2(5,6); // Create power command
 	can.send_CAN(packet);
 	delay(100);
 	can.send_CAN(packet2);
@@ -69,30 +57,31 @@ void read_ins()
 #ifdef MODERX
 void loop()
 {
-	if (digitalRead(5) == LOW)
-	{
-		can.receive_CAN(errors); //Reads CAN data into buffer
-	}
-
 	if (can.messageExists())
 	{
-		DC_Drive packet(can.buffer.dequeue()); //Get the drive packet
-		char str[50]; sprintf(str, "Id: %x, Vel: %d, Cur: %d,", packet.id, packet.velocity, packet.current);
-		Serial.println(str);
-		delay(250);
-	}
-	else
-	{
-		Serial.println("NO MESSAGE");
-		Serial.print("errors: ");
-		Serial.println(errors, BIN);
-		/*Serial.print("TEC: ");
-		Serial.println(can.controller.Read(TEC), BIN);
-		Serial.print("REC: ");
-		Serial.println(can.controller.Read(REC), BIN);
-		Serial.print("EFLG: ");
-		Serial.println(can.controller.Read(EFLG), BIN);*/
-		delay(250);
+                Frame f = can.buffer.dequeue();
+                char str[50]; 
+                switch (f.id)
+                {
+                  case DC_DRIVE_ID:
+                  {
+        		DC_Drive packet(f); //Get the drive packet
+                        sprintf(str, "Id: %x, Vel: %d, Cur: %d,", packet.id, packet.velocity, packet.current);
+        		Serial.println(str);
+                   break;
+                  }
+                  case BMS_HEARTBEAT_ID:
+                  {
+                        BMS_Heartbeat packet(f);
+                        sprintf(str, "Id: %x, S_NO: %d", packet.id, packet.serial_no);
+        		Serial.println(str);
+                   break;
+                  }
+                  default:
+                    Serial.println("unknown");
+                    Serial.println(f.id);
+                  break;
+                }
 	}
 }
 #endif

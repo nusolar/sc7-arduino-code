@@ -6,25 +6,48 @@
 #include "CAN_IO.h"
 #include <SPI.h>
 
-CAN_IO::CAN_IO(byte CS_pin, byte INT_pin) :
-controller(CS_pin, INT_pin) {}
+CAN_IO::CAN_IO(byte CS_pin, byte INT_p) :
+errptr(0), INT_pin(INT_p), controller(CS_pin, INT_p)  {}
 
-void CAN_IO::setup(FilterInfo& filters, byte errors) {
+/*
+ * Define global interrupt function
+ */
+void CAN_ISR()
+{
+  mainCAN->receiveCAN();
+}
+// Make sure to initialize the mainCAN pointer to 0 here.
+CAN_IO* mainCAN = 0;
+
+/*
+ * Setup function for CAN_IO. Arguments are a FilterInfo struct and a pointer to a place to raise error flags.
+ */
+void CAN_IO::setup(const FilterInfo& filters, uint16_t* errorflags, bool isMainCan) {
 	// SPI setup
 	SPI.setClockDivider(10);
 	SPI.setDataMode(SPI_MODE0);
 	SPI.setBitOrder(MSBFIRST);
 	SPI.begin();
 
+        // Set as main can
+        if (isMainCan){  
+            mainCAN = this; 
+        }
+        
+        attachInterrupt(INT_pin,CAN_ISR,LOW);
+        
+        // Attach error flag pointer
+        errptr = errorflags;
+
 	// init the controller
 	int baudRate = controller.Init(1000, 25);
 	if (baudRate <= 0) { // error
-		errors |= 0x04;
+		*errptr |= CANERR_SETUP_BAUDFAIL;
 	}
 
 	// return controller to config mode
 	if (!controller.Mode(MODE_CONFIG)) { // error
-		errors |= 0x08;
+		*errptr |= CANERR_SETUP_MODEFAIL;
 	}
 
 	// disable interrupts we don't care about
@@ -45,12 +68,12 @@ void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	}
 }
 
-void CAN_IO::receive_CAN(uint8_t& errflags) {
+void CAN_IO::receiveCAN() {
 	// read status of CANINTF register
 	byte interrupt = controller.GetInterrupt();
 
 	if (interrupt & MERRF) { // message error
-		errflags |= 0x01; // this needs to be a real value!
+		*errptr |= 0x01; // this needs to be a real value!
 	}
 
 	if (interrupt & WAKIF) { // wake-up interrupt
@@ -58,7 +81,7 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	if (interrupt & ERRIF) { // error interrupt
-		errflags |= 0x02; // this needs to be a real value!
+		*errptr |= 0x02; // this needs to be a real value!
 	}
 
 	if (interrupt & TX2IF) { // transmit buffer 2 empty
@@ -82,12 +105,14 @@ void CAN_IO::receive_CAN(uint8_t& errflags) {
 	}
 
 	// clear interrupt
-	controller.ResetInterrupt(0xFF); // reset all interrupts
+	controller.ResetInterrupt(INTALL); // reset all interrupts
 }
 
-void CAN_IO::send_CAN(Layout& layout) {
+void CAN_IO::sendCAN(Layout& layout) {
 	controller.LoadBuffer(TXB0, layout.generate_frame());
 	controller.SendBuffer(TXB0);
+
+        // Errors????
 }
 
 void CAN_IO::write_rx_filter(uint8_t address, uint16_t data) {

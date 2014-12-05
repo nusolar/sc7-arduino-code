@@ -26,7 +26,41 @@ struct FilterInfo {
 	uint16_t RXF3; // filter 3 (RXB1)
 	uint16_t RXF4; // filter 4 (RXB1)
 	uint16_t RXF5; // filter 5 (RXB1)
+
+       /* FilterInfo() : RXM0(0), RXM1(0) {} // Initialize to no masking
+
+        void setRB0(uint16_t m0, uint16_t f0, uint16_t f1)
+        {
+          RXM0 = m0;
+          RXF0 = f0;
+          RXF1 = f1;
+        }
+        
+        void setRB1(uint16_t m1, uint16_t f2, uint16_t f3, uint16_t f4, uint16_t f5)
+        {
+          RXM1 = m1;
+          RXF2 = f2;
+          RXF3 = f3;
+          RXF4 = f4;
+          RXF5 = f5;
+        }*/
 };
+
+/*
+ * Define Extra can errors besides those defined in MCP2515_defs.
+  #define RX0IF                  0x01
+  #define RX1IF                  0x02
+  #define TX0IF                  0x04
+  #define TX1IF                  0x08
+  #define TX2IF                  0x10
+  #define ERRIF                  0x20
+  #define WAKIF                  0x40
+  #define MERRF                  0x80 
+ */
+  #define CANERR_SETUP_BAUDFAIL   0x0100 // Failed to set baud rate properly during setup
+  #define CANERR_SETUP_MODEFAIL   0x0200 // Failed to switch modes
+  #define CANERR_BUFFER_FULL      0x0400 // Local buffer is full
+  #define CANERR_MCPBUF_FULL      0x0800 // MCP2515 is reporting buffer overflow errors
 
 /*
  * Class for handling CAN I/O operations using the
@@ -47,18 +81,18 @@ public:
 	 * including read masks/filters. All types of interrupt
 	 * are enabled.
 	 */
-	void setup(FilterInfo& filters, byte errors);
+	void setup(const FilterInfo& filters, uint16_t* errorflags, bool isMainCan);
 
 	/*
 	 * Invoked when the interrupt pin is pulled low. Handles
 	 * errors or reads messages, determined by the type of interrupt.
 	 */
-	void receive_CAN(uint8_t& errflags);
+	void receiveCAN();
 
 	/*
 	 * Sends messages to the CAN bus via the controller.
 	 */
-	void send_CAN(Layout& layout);
+	void sendCAN(Layout& layout);
         
         // Will be used to set up receive filters in a cleaner way.
         /*void set_RB1_filters(uint16_t mask,uint16_t filter,uint16_t filter);
@@ -74,7 +108,8 @@ public:
         
     MCP2515 controller;
 private:
-
+        uint16_t* errptr;
+        byte      INT_pin;
 	/*
 	 * Helper function for configuring the RX masks/filters.
 	 * If first is true, sets the mask/filter for the first buffer;
@@ -94,5 +129,10 @@ private:
 	 */
 	uint8_t second_byte(uint16_t value);
 };
+
+/*
+ * Declare a pointer to the main can_io instance
+ */
+extern CAN_IO* mainCAN;
 
 #endif

@@ -16,7 +16,7 @@
 
 // BMS TX
 #define BMS_HEARTBEAT_ID	0x600
-#define BMS_SOC_ID			0x6F4
+#define BMS_SOC_ID	        0x6F4
 #define BMS_BAL_SOC_ID		0x6F5
 #define BMS_PRECHARGE_ID	0x6F7
 #define BMS_VOLT_CURR_ID	0x6FA
