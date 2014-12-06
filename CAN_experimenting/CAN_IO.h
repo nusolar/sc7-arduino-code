@@ -47,7 +47,7 @@ public:
 	 * including read masks/filters. All types of interrupt
 	 * are enabled.
 	 */
-	void setup(FilterInfo& filters, byte errors);
+	void setup(FilterInfo& filters, byte& errors);
 
 	/*
 	 * Invoked when the interrupt pin is pulled low. Handles

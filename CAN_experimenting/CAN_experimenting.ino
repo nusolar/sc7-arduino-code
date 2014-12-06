@@ -24,19 +24,6 @@ void setup()
 	can.setup(filters, errors);
 	Serial.println(errors, BIN);
 
-	/* Queue Testing Code -- Works 11/26/14 */
-	RX_Deque<8> testqueue;
-
-	for (int i = 0; i < 10; i++)
-	{
-		testqueue.enqueue_head(DC_Drive(40, i).generate_frame());
-	}
-
-	for (int i = 0; !testqueue.is_empty(); i++)
-	{
-		Serial.println(testqueue.dequeue_head().high);
-	}
-
 }
 
 /* For TX*/

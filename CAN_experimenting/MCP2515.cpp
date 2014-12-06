@@ -42,6 +42,7 @@ MCP2515::MCP2515(byte CS_Pin, byte INT_Pin) {
 int MCP2515::Init(int CAN_Bus_Speed, byte Freq) {
   if(CAN_Bus_Speed>0) {
     if(_init(CAN_Bus_Speed, Freq, 1, false)) return CAN_Bus_Speed;
+    Serial.println("here");
   } else {
       int i=0;
       byte interruptFlags = 0;
@@ -122,7 +123,6 @@ bool MCP2515::_init(int CAN_Bus_Speed, byte Freq, byte SJW, bool autoBaud) {
   // Programming requirements
   if(PRSEG + PHSEG1 < PHSEG2) return false;
   if(PHSEG2 <= SJW) return false;
-  
   byte BTLMODE = 1;
   byte __SAM = 0;
   

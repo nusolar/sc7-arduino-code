@@ -9,7 +9,7 @@
 CAN_IO::CAN_IO(byte CS_pin, byte INT_pin) :
 controller(CS_pin, INT_pin) {}
 
-void CAN_IO::setup(FilterInfo& filters, byte errors) {
+void CAN_IO::setup(FilterInfo& filters, byte& errors) {
 	// SPI setup
 	SPI.setClockDivider(10);
 	SPI.setDataMode(SPI_MODE0);
@@ -17,7 +17,7 @@ void CAN_IO::setup(FilterInfo& filters, byte errors) {
 	SPI.begin();
 
 	// init the controller
-	int baudRate = controller.Init(1000, 25);
+	int baudRate = controller.Init(1000, 20);
 	if (baudRate <= 0) { // error
 		errors |= 0x04;
 	}
