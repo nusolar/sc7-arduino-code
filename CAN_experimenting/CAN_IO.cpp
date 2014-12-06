@@ -31,7 +31,8 @@ void CAN_IO::setup(const FilterInfo& filters, uint16_t* errorflags, bool isMainC
 
         // Set as main can
         if (isMainCan){  
-            mainCAN = this; 
+            mainCAN = this;
+            Serial.println((int)mainCAN,HEX);
         }
         
         attachInterrupt(INT_pin,CAN_ISR,LOW);
@@ -40,7 +41,7 @@ void CAN_IO::setup(const FilterInfo& filters, uint16_t* errorflags, bool isMainC
         errptr = errorflags;
 
 	// init the controller
-	int baudRate = controller.Init(1000, 25);
+	int baudRate = controller.Init(1000, 20);
 	if (baudRate <= 0) { // error
 		*errptr |= CANERR_SETUP_BAUDFAIL;
 	}

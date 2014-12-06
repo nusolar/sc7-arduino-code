@@ -1,6 +1,7 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
 #define MODERX
+//#define DEBUG
 
 #include <SPI.h>
 #include "CAN_IO.h"
@@ -9,6 +10,7 @@
 #define pedalPin A10
 
 CAN_IO can(4, 5);
+CAN_IO* myCAN = &can;
 FilterInfo filters{ 0xFFF, 0xFFF, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
 uint16_t errors = 0;
 
@@ -24,7 +26,10 @@ void setup()
         //filters.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
         //filters.setRB1(MASK_Sxxx,BMS_HEARTBEAT_ID,0,0,0);
         can.setup(filters, &errors, true);
+        //attachInterrupt(5,canint,LOW);
+#ifdef DEBUG
 	Serial.println(errors, BIN);
+#endif
 }
 
 /* For TX*/
@@ -34,16 +39,18 @@ void loop()
 	read_ins();
 	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
 	BMS_Heartbeat packet2(5,6); // Create power command
-	can.send_CAN(packet);
+	can.sendCAN(packet);
 	delay(100);
-	can.send_CAN(packet2);
+	can.sendCAN(packet2);
 	delay(100);
-	/*Serial.print("TEC: ");
+#ifdef DEBUG
+	Serial.print("TEC: ");
 	Serial.println(can.controller.Read(TEC), BIN);
 	Serial.print("REC: ");
 	Serial.println(can.controller.Read(REC), BIN);
 	Serial.print("EFLG: ");
-	Serial.println(can.controller.Read(EFLG), BIN);*/
+	Serial.println(can.controller.Read(EFLG), BIN);
+#endif
 }
 
 void read_ins()
@@ -67,7 +74,7 @@ void loop()
                   {
         		DC_Drive packet(f); //Get the drive packet
                         sprintf(str, "Id: %x, Vel: %d, Cur: %d,", packet.id, packet.velocity, packet.current);
-        		Serial.println(str);
+        		Serial.println(str); 
                    break;
                   }
                   case BMS_HEARTBEAT_ID:
@@ -79,10 +86,18 @@ void loop()
                   }
                   default:
                     Serial.println("unknown");
-                    Serial.println(f.id);
+                    Serial.println(f.id,HEX);
                   break;
                 }
+#ifdef DEBUG
+                Serial.print("Buffer Count:");
+                Serial.println(can.buffer.size());
+#endif
 	}
 }
 #endif
 
+/*void canint()
+{
+  myCAN->receiveCAN();
+}*/
