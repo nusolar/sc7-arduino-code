@@ -1,7 +1,7 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
-#define MODERX
-//#define DEBUG
+#define MODETX
+#define DEBUG
 
 #include <SPI.h>
 #include "CAN_IO.h"
@@ -11,7 +11,7 @@
 
 CAN_IO can(4, 5);
 CAN_IO* myCAN = &can;
-FilterInfo filters{ 0xFFF, 0xFFF, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
+FilterInfo filters{ 0x000, 0x000, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
 uint16_t errors = 0;
 
 struct
@@ -22,6 +22,7 @@ struct
 
 void setup()
 {
+        pinMode(12,INPUT_PULLUP); //Set up push button to toggle message transmition
 	Serial.begin(9600);
         //filters.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
         //filters.setRB1(MASK_Sxxx,BMS_HEARTBEAT_ID,0,0,0);
@@ -36,6 +37,9 @@ void setup()
 #ifdef MODETX
 void loop()
 {
+    if (digitalRead(12)== LOW)
+    {
+      digitalWrite(13,LOW);
 	read_ins();
 	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
 	BMS_Heartbeat packet2(5,6); // Create power command
@@ -51,6 +55,8 @@ void loop()
 	Serial.print("EFLG: ");
 	Serial.println(can.controller.Read(EFLG), BIN);
 #endif
+    digitalWrite(13,HIGH);
+    }
 }
 
 void read_ins()
