@@ -4,21 +4,16 @@
 #define DEBUG
 
 #include <SPI.h>
-#include "CAN_IO.h"
-#include "RX_Queue.h"
+#include "CAN_experimenting.h"
 
-#define pedalPin A10
+#define CANINT 5
+#define CANCS 4
+#define CAN_NBT 1000  //Nominal Bit Time
+#define CAN_FOSC 16
 
-CAN_IO can(4, 5);
-CAN_IO* myCAN = &can;
+CAN_IO can(CANCS,CANINT,CAN_NBT,CAN_FOSC);
 FilterInfo filters{ 0x000, 0x000, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
 uint16_t errors = 0;
-
-struct
-{
-	uint16_t raw_pedal;
-	float current;
-} Status;
 
 void setup()
 {
@@ -27,7 +22,6 @@ void setup()
         //filters.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
         //filters.setRB1(MASK_Sxxx,BMS_HEARTBEAT_ID,0,0,0);
         can.setup(filters, &errors, true);
-        //attachInterrupt(5,canint,LOW);
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
@@ -35,6 +29,7 @@ void setup()
 
 /* For TX*/
 #ifdef MODETX
+
 void loop()
 {
     if (digitalRead(12)== LOW)
@@ -43,9 +38,9 @@ void loop()
 	read_ins();
 	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
 	BMS_Heartbeat packet2(5,6); // Create power command
-	can.sendCAN(packet);
+	can.sendCAN(packet,TXB0);
 	delay(100);
-	can.sendCAN(packet2);
+	can.sendCAN(packet2,TXB0);
 	delay(100);
 #ifdef DEBUG
 	Serial.print("TEC: ");
@@ -72,7 +67,7 @@ void loop()
 {
 	if (can.messageExists())
 	{
-                Frame f = can.buffer.dequeue();
+                Frame& f = can.RXbuffer.dequeue();
                 char str[50]; 
                 switch (f.id)
                 {
@@ -97,13 +92,8 @@ void loop()
                 }
 #ifdef DEBUG
                 Serial.print("Buffer Count:");
-                Serial.println(can.buffer.size());
+                Serial.println(can.RXbuffer.size());
 #endif
 	}
 }
 #endif
-
-/*void canint()
-{
-  myCAN->receiveCAN();
-}*/
