@@ -19,6 +19,7 @@ void setup()
 {
         pinMode(12,INPUT_PULLUP); //Set up push button to toggle message transmition
 	Serial.begin(9600);
+        delay(100);
         //filters.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
         //filters.setRB1(MASK_Sxxx,BMS_HEARTBEAT_ID,0,0,0);
         can.setup(filters, &errors, true);
@@ -37,7 +38,7 @@ void loop()
       digitalWrite(13,LOW);
 	read_ins();
 	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
-	BMS_Heartbeat packet2(5,6); // Create power command
+	DC_SwitchPos packet2(true); // Create switch enabled command
 	can.sendCAN(packet,TXB0);
 	delay(100);
 	can.sendCAN(packet2,TXB0);
@@ -57,7 +58,7 @@ void loop()
 void read_ins()
 {
 	Status.raw_pedal = analogRead(pedalPin);
-	Status.current = Status.raw_pedal*100.0 / 750.0;
+	Status.current = Status.raw_pedal*100.0 / 710.0;
 }
 #endif
 
