@@ -1,7 +1,7 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
 #define MODETX
-#define DEBUG
+//#define DEBUG
 
 #include <SPI.h>
 #include "CAN_experimenting.h"
@@ -15,6 +15,8 @@ CAN_IO can(CANCS,CANINT,CAN_NBT,CAN_FOSC);
 FilterInfo filters{ 0x000, 0x000, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
 uint16_t errors = 0;
 
+Frame dframe;
+
 void setup()
 {
         pinMode(12,INPUT_PULLUP); //Set up push button to toggle message transmition
@@ -26,6 +28,9 @@ void setup()
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
+
+        dframe.id = 0x501;
+        dframe.low = 0.0f;
 }
 
 /* For TX*/
@@ -37,12 +42,12 @@ void loop()
     {
       digitalWrite(13,LOW);
 	read_ins();
-	DC_Drive packet(0,Status.current); // Create drive command, vel = 40, cur = 5;
-	DC_SwitchPos packet2(true); // Create switch enabled command
+	DC_Drive packet(100.0,Status.current); // Create drive command
+	//DC_Power packet2(1); // Create switch enabled command
 	can.sendCAN(packet,TXB0);
-	delay(100);
-	can.sendCAN(packet2,TXB0);
-	delay(100);
+	delay(50);
+	//can.sendCAN(packet2,TXB0);
+	delay(50);
 #ifdef DEBUG
 	Serial.print("TEC: ");
 	Serial.println(can.controller.Read(TEC), BIN);
@@ -58,7 +63,7 @@ void loop()
 void read_ins()
 {
 	Status.raw_pedal = analogRead(pedalPin);
-	Status.current = Status.raw_pedal*100.0 / 710.0;
+	Status.current = Status.raw_pedal / 710.0 / 2.0;
 }
 #endif
 
@@ -75,25 +80,27 @@ void loop()
                   case DC_DRIVE_ID:
                   {
         		DC_Drive packet(f); //Get the drive packet
-                        sprintf(str, "Id: %x, Vel: %d, Cur: %d,", packet.id, packet.velocity, packet.current);
+                        sprintf(str, "Id: %x, Vel: %f, Cur: %f,", packet.id, packet.velocity, packet.current);
         		Serial.println(str); 
                    break;
                   }
-                  case BMS_HEARTBEAT_ID:
+                  case DC_POWER_ID:
                   {
-                        BMS_Heartbeat packet(f);
-                        sprintf(str, "Id: %x, S_NO: %d", packet.id, packet.serial_no);
+                        DC_Power packet(f);
+                        sprintf(str, "Id: %x, Cur: %.4f", packet.id, packet.bus_current);
         		Serial.println(str);
                    break;
                   }
                   default:
-                    Serial.println("unknown");
-                    Serial.println(f.id,HEX);
+                    //Serial.println("M");
                   break;
                 }
 #ifdef DEBUG
-                Serial.print("Buffer Count:");
-                Serial.println(can.RXbuffer.size());
+                if (millis() % 1000 == 0)
+                {
+                  Serial.print("Buffer Count:");
+                  Serial.println(can.RXbuffer.size());
+                }
 #endif
 	}
 }
