@@ -1,3 +1,5 @@
+#include <Metro.h>
+
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
 #define MODETX
@@ -11,11 +13,11 @@
 #define CAN_NBT 1000  //Nominal Bit Time
 #define CAN_FOSC 16
 
+#define PEDAL_ACCL_MAX_CURRENT 0.8f
+
 CAN_IO can(CANCS,CANINT,CAN_NBT,CAN_FOSC);
 FilterInfo filters{ 0x000, 0x000, DC_DRIVE_ID, 0, BMS_HEARTBEAT_ID, 0, 0, 0 }; //Set up masks and filters. All of them 0 for now.
 uint16_t errors = 0;
-
-Frame dframe;
 
 void setup()
 {
@@ -28,9 +30,6 @@ void setup()
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
-
-        dframe.id = 0x501;
-        dframe.low = 0.0f;
 }
 
 /* For TX*/
@@ -40,14 +39,10 @@ void loop()
 {
     if (digitalRead(12)== LOW)
     {
-      digitalWrite(13,LOW);
-	read_ins();
+      read_ins();
 	DC_Drive packet(100.0,Status.current); // Create drive command
-	//DC_Power packet2(1); // Create switch enabled command
 	can.sendCAN(packet,TXB0);
-	delay(50);
-	//can.sendCAN(packet2,TXB0);
-	delay(50);
+	delay(100);
 #ifdef DEBUG
 	Serial.print("TEC: ");
 	Serial.println(can.controller.Read(TEC), BIN);
@@ -56,14 +51,13 @@ void loop()
 	Serial.print("EFLG: ");
 	Serial.println(can.controller.Read(EFLG), BIN);
 #endif
-    digitalWrite(13,HIGH);
     }
 }
 
 void read_ins()
 {
 	Status.raw_pedal = analogRead(pedalPin);
-	Status.current = Status.raw_pedal / 710.0 / 2.0;
+	Status.current = constrain(Status.raw_pedal / 710.0 , 0.0f, PEDAL_ACCL_MAX_CURRENT);
 }
 #endif
 
@@ -80,7 +74,7 @@ void loop()
                   case DC_DRIVE_ID:
                   {
         		DC_Drive packet(f); //Get the drive packet
-                        sprintf(str, "Id: %x, Vel: %f, Cur: %f,", packet.id, packet.velocity, packet.current);
+                        sprintf(str, "Id: %x, Vel: %.1f, Cur: %.4f,", packet.id, packet.velocity, packet.current);
         		Serial.println(str); 
                    break;
                   }
@@ -92,7 +86,7 @@ void loop()
                    break;
                   }
                   default:
-                    //Serial.println("M");
+                    // Don't do anything right now. Too many messages when we're on the car.
                   break;
                 }
 #ifdef DEBUG
