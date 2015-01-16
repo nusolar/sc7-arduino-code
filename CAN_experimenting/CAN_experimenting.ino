@@ -29,7 +29,7 @@ void setup()
     CANFilterOpt filter;
     filter.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
     filter.setRB1(MASK_Sxxx,BMS_SOC_ID,0,0,0);
-    can.setup(filter, &errors, true);
+    can.setup(filter, &errors);
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
@@ -55,7 +55,7 @@ void loop()
 	
 	if (can.messageExists())
 	{
-		Frame& f = can.RXbuffer.dequeue();
+		Frame& f = can.messageDequeue();
 		char str[50]; 
 		switch (f.id)
 		{
