@@ -1,6 +1,6 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
-#define DEBUG
+//#define DEBUG
 
 #include <SPI.h>
 #include "CAN_experimenting.h"
@@ -41,16 +41,16 @@ void loop()
   //Read switch position from serial
     if (Serial.available())
     {
-       switchpos = (Serial.read() == '1') ? 0x0020 : 0x0040 ;
+       switchpos = (Serial.read() == '1') ? 0x0040 : 0x0020 ;
     }
     
     if (digitalRead(12)== LOW) // if the transmit button is pressed
     {
 		read_ins();
 		can.Send(DC_Drive(100.0,Status.current),TXB0);
-delay(100);
                 Frame f;
-                f.low = switchpos;
+                f.value = 0;
+                f.s0 = switchpos;
                 f.id = DC_SWITCHPOS_ID;
 	        f.dlc = 8; // send 8 bytes
 	        f.ide = 0; // make it a standard frame
@@ -89,9 +89,6 @@ delay(100);
 			Serial.println(str);
 			break;
 		  }
-                  default:
-                  Serial.print("u");
-                  break;
 	         }
 		
 		//Print out buffer size so we can see if there is overflow (this is not accurate when serial is enabled.
