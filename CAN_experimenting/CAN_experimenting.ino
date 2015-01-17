@@ -1,6 +1,6 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
-//#define DEBUG
+#define DEBUG
 
 #include <SPI.h>
 #include "CAN_experimenting.h"
@@ -15,6 +15,7 @@
 CAN_IO can(CANCS,CANINT,CAN_NBT,CAN_FOSC);
 uint16_t errors = 0; // for catching can errors
 long lastmillis = 0; // for timing 
+int switchpos = 0x0020; // run position
 
 void setup()
 {
@@ -27,9 +28,9 @@ void setup()
 	
     //create a filter options structure
     CANFilterOpt filter;
-    filter.setRB0(MASK_Sxxx,DC_DRIVE_ID,0);
-    filter.setRB1(MASK_Sxxx,BMS_SOC_ID,0,0,0);
-    can.setup(filter, &errors);
+    filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
+    filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
+    can.Setup(filter, &errors);
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
@@ -37,11 +38,26 @@ void setup()
 
 void loop()
 {
+  //Read switch position from serial
+    if (Serial.available())
+    {
+       switchpos = (Serial.read() == '1') ? 0x0020 : 0x0040 ;
+    }
+    
     if (digitalRead(12)== LOW) // if the transmit button is pressed
     {
 		read_ins();
-		DC_Drive packet(100.0,Status.current); // Create drive command
-		can.sendCAN(packet,TXB0);
+		can.Send(DC_Drive(100.0,Status.current),TXB0);
+delay(100);
+                Frame f;
+                f.low = switchpos;
+                f.id = DC_SWITCHPOS_ID;
+	        f.dlc = 8; // send 8 bytes
+	        f.ide = 0; // make it a standard frame
+	        f.rtr = 0; // make it a data frame
+	        f.srr = 0;
+                
+                can.Send(f,TXB1);
 		delay(100);
 #ifdef DEBUG
 		Serial.print("TEC: ");
@@ -53,10 +69,10 @@ void loop()
 #endif
     }
 	
-	if (can.messageExists())
+	while (can.Available())
 	{
-		Frame& f = can.messageDequeue();
-		char str[50]; 
+		Frame& f = can.Read();
+		char str[50];
 		switch (f.id)
 		{
 		  case DC_DRIVE_ID:
@@ -66,14 +82,17 @@ void loop()
 			Serial.println(str); 
 			break;
 		  }
-		  case BMS_SOC_ID:
+		  case DC_SWITCHPOS_ID:
 		  {
-			BMS_SOC packet(f);
-			sprintf(str, "Id: %x, Pack: %.4f", packet.id, packet.percent_SOC);
+			DC_SwitchPos packet(f);
+			sprintf(str, "Id: %x, Pack: %d", packet.id, packet.is_run);
 			Serial.println(str);
 			break;
 		  }
-		}
+                  default:
+                  Serial.print("u");
+                  break;
+	         }
 		
 		//Print out buffer size so we can see if there is overflow (this is not accurate when serial is enabled.
 		if (millis() > lastmillis + 1000)
