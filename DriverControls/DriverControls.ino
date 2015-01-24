@@ -38,6 +38,14 @@ const uint16_t BMS_SEND_INTERVAL = 1000; // bms send packet
 const uint16_t SW_SEND_INTERVAL = 1000; // steering wheel send packet
 const uint16_t DC_SEND_INTERVAL = 1000; // driver controls heartbeat
 
+// other parameters
+const uint16_t MAX_ACCEL_VOLTAGE = 1024;
+
+// errors
+const uint16_t MC_TIMEOUT = 0x0001;
+const uint16_t BMS_TIMEOUT = 0x0002;
+const uint16_t SW_TIMEOUT = 0x0004;
+
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
  * Enum to represet the possible gear states.
@@ -51,29 +59,32 @@ struct CarState {
   // pedals
   bool brakeEngaged;
   bool regenEngaged;
-  uint16_t accelPedal;
+  uint16_t accelRaw; // raw voltage reading
+  
+  // gearing
+  GearState gear;
   
   // motor info
-  uint16_t motorVelocity;
-  uint16_t busCurrent;
+  float motorVelocity;
+  float busCurrent;
   float carVelocity;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
 // CAN variables
-CAN_IO canController(CS_PIN, INTERRUPT_PIN, BAUD_RATE, FREQ);
+CAN_IO canControl(CS_PIN, INTERRUPT_PIN, BAUD_RATE, FREQ);
 
 // car state
 CarState state;
 
 // timers
 Metro mcHbTimer(MC_HB_INTERVAL); // motor controller heartbeat
-Metro swHbtimer(SW_HB_INTERVAL); // steering wheel heartbeat
-Metro bmsHbtimer(BMS_HB_INTERVAL); // bms heartbeat
+Metro swHbTimer(SW_HB_INTERVAL); // steering wheel heartbeat
+Metro bmsHbTimer(BMS_HB_INTERVAL); // bms heartbeat
 Metro mcSendTimer(MC_SEND_INTERVAL); // motor controller send packet
 Metro swSendtimer(SW_SEND_INTERVAL); // steering wheel send packet
 Metro bmsSendtimer(BMS_SEND_INTERVAL); // bms send packet
-Metro dcSendtimer(DC_SEND_INTERVAL); // driver controls heartbeat
+Metro dcSendTimer(DC_SEND_INTERVAL); // driver controls heartbeat
 WDT wdt; // watchdog timer
 
 // errors
@@ -83,35 +94,86 @@ uint16_t errorFlags;
 /*
  * Reads general purpose input and updates car state.
  */
-void readInputs();
+void readInputs() {
+  // read brake, regen
+  state.brakeEngaged = (digitalRead(BRAKE_PIN) == LOW);
+  state.regenEngaged = (digitalRead(REGEN_PIN) == LOW);
+  
+  // read accel pedal
+  state.accelRaw = analogRead(ACCEL_PIN);
+}
 
 /*
  * Reads packets from CAN message queue and updates car state.
  */
-void readCAN();
+void readCAN() {
+  while (canControl.Available()) { // there are messages
+    Frame& f = canControl.Read(); // read one message
+    
+    // determine source and update heartbeat timers
+    if ((f.id & 0xF00) == BMS_HEARTBEAT_ID) { // source is bms
+      bmsHbTimer.reset();
+    }
+    else if ((f.id & 0xF00 == MC_HEARTBEAT_ID) { // source is mc
+      mcHbTimer.reset();
+    }
+    else if ((f.id & 0xF00 == SW_HEARTBEAT_ID) { // source is sw
+      swHbTimer.reset();
+    }
+    
+    // check for specific packets
+    switch (f.id) {
+    case MC_BUS_STATUS_ID: // motor controller bus status
+      MC_BusStatus packet(f);
+      state.busCurrent = packet.bus_current;
+      break;
+    case MC_VELOCITY_ID: // motor controller velocity
+      MC_Velocity packet(f);
+      state.motorVelocity = packet.motor_velocity;
+      state.carVelocity = packet.carVelocity;
+      break;      
+    }
+  }
+}
 
 /*
  * Sets general purpose output according to car state.
  */
-void writeOutputs();
+void writeOutputs() {
+  // nothing to do for now
+}
 
 /*
  * Checks timers to see if packets need to be sent out over the CAN bus.
  * If so, sends the appropriate packets.
  */
-void writeCAN();
+void writeCAN() {
+  // implementation please
+}
 
 /*
  * Checks heartbeat timers to make sure all systems are still connected.
  * If any timer has expired, updates the error state.
  */
-void checkTimers();
+void checkTimers() {
+  if (mcHbTimer.check()) { // motor controller timeout
+    errorFlags &= MC_TIMEOUT;
+  }
+  if (bmsHbtimer.check()) {
+    errorFlags &= BMS_TIMEOUT;
+  }
+  if (swHbTimer.check()) {
+    errorFlags &= SW_TIMEOUT;
+  }
+}
 
 /*
  * Checks the CAN controller and any other components for errors.
  * If errors exist, updates the error state.
  */
-void checkErrors();
+void checkErrors() {
+  // nothing to do for now
+}
 
 //--------------------------MAIN FUNCTIONS---------------------------//
 void setup() {
@@ -123,7 +185,7 @@ void setup() {
   CanFilterOpt filters;
   filters.setRBO(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canController.setup(filters, &errorFlags);
+  canControl.Setup(filters, &errorFlags);
   
   // reset timers
   mcHbTimer.reset();
@@ -136,4 +198,23 @@ void setup() {
 }
 
 void loop() {
+  // clear watchdog timer
+  
+  // read GPIO
+  readInputs();
+  
+  // read CAN
+  readCAN();
+  
+  // write GPIO
+  writeOutputs();
+  
+  // write CAN
+  writeCAN();
+  
+  // check timers
+  checkTimers();
+  
+  // check errors
+  checkErrors();
 }
