@@ -6,8 +6,9 @@
 
 #include <stdint.h>
 #include <Metro.h>
-#include "CAN_IO.h"
-#include "WDT.h"
+#include <SPI.h>
+#include "sc7-can-libinclude.h"
+//#include "WDT.h"
 
 //------------------------------CONSTANTS----------------------------//
 // pins
@@ -38,8 +39,9 @@ const uint16_t BMS_SEND_INTERVAL = 1000; // bms send packet
 const uint16_t SW_SEND_INTERVAL = 1000; // steering wheel send packet
 const uint16_t DC_SEND_INTERVAL = 1000; // driver controls heartbeat
 
-// other parameters
+// acceleration parameters
 const uint16_t MAX_ACCEL_VOLTAGE = 1024;
+const float MAX_ACCEL_RATIO = 0.8;
 
 // errors
 const uint16_t MC_TIMEOUT = 0x0001;
@@ -82,10 +84,10 @@ Metro mcHbTimer(MC_HB_INTERVAL); // motor controller heartbeat
 Metro swHbTimer(SW_HB_INTERVAL); // steering wheel heartbeat
 Metro bmsHbTimer(BMS_HB_INTERVAL); // bms heartbeat
 Metro mcSendTimer(MC_SEND_INTERVAL); // motor controller send packet
-Metro swSendtimer(SW_SEND_INTERVAL); // steering wheel send packet
-Metro bmsSendtimer(BMS_SEND_INTERVAL); // bms send packet
+Metro swSendTimer(SW_SEND_INTERVAL); // steering wheel send packet
+Metro bmsSendTimer(BMS_SEND_INTERVAL); // bms send packet
 Metro dcSendTimer(DC_SEND_INTERVAL); // driver controls heartbeat
-WDT wdt; // watchdog timer
+//WDT wdt; // watchdog timer
 
 // errors
 uint16_t errorFlags;
@@ -114,25 +116,23 @@ void readCAN() {
     if ((f.id & 0xF00) == BMS_HEARTBEAT_ID) { // source is bms
       bmsHbTimer.reset();
     }
-    else if ((f.id & 0xF00 == MC_HEARTBEAT_ID) { // source is mc
+    else if ((f.id & 0xF00) == MC_HEARTBEAT_ID) { // source is mc
       mcHbTimer.reset();
     }
-    else if ((f.id & 0xF00 == SW_HEARTBEAT_ID) { // source is sw
+    else if ((f.id & 0xF00) == SW_HEARTBEAT_ID) { // source is sw
       swHbTimer.reset();
     }
     
     // check for specific packets
-    switch (f.id) {
-    case MC_BUS_STATUS_ID: // motor controller bus status
+    if (f.id == MC_BUS_STATUS_ID) { // motor controller bus status
       MC_BusStatus packet(f);
       state.busCurrent = packet.bus_current;
-      break;
-    case MC_VELOCITY_ID: // motor controller velocity
+    }
+    else if (f.id == MC_VELOCITY_ID) { // motor controller velocity
       MC_Velocity packet(f);
       state.motorVelocity = packet.motor_velocity;
-      state.carVelocity = packet.carVelocity;
-      break;      
-    }
+      state.carVelocity = packet.car_velocity;
+    }   
   }
 }
 
@@ -148,7 +148,36 @@ void writeOutputs() {
  * If so, sends the appropriate packets.
  */
 void writeCAN() {
-  // implementation please
+  // see if motor controller packet needs to be sent
+  if (mcSendTimer.check()) { // ready to send drive command
+    // setup velocity
+    float velocity;
+    switch (state.gear) {
+    case FORWARD:
+      velocity = 100;
+      break;
+    case REVERSE:
+      velocity = -100;
+      break;
+    case REGEN:
+    case BRAKE:
+      velocity = 0;
+      break;
+    }
+    
+    // setup current
+    float currentRatio = float(state.accelRaw) / MAX_ACCEL_VOLTAGE;
+    if (currentRatio > MAX_ACCEL_RATIO) {
+      currentRatio = MAX_ACCEL_RATIO;
+    }
+    
+    // create and send packet
+    DC_Drive packet(velocity, currentRatio);
+    canControl.Send(packet, TXB0);
+    
+    // reset timer
+    mcSendTimer.reset();
+  }
 }
 
 /*
@@ -159,7 +188,7 @@ void checkTimers() {
   if (mcHbTimer.check()) { // motor controller timeout
     errorFlags &= MC_TIMEOUT;
   }
-  if (bmsHbtimer.check()) {
+  if (bmsHbTimer.check()) {
     errorFlags &= BMS_TIMEOUT;
   }
   if (swHbTimer.check()) {
@@ -182,8 +211,8 @@ void setup() {
   pinMode(REGEN_PIN, INPUT_PULLUP);
   
   // setup CAN
-  CanFilterOpt filters;
-  filters.setRBO(RXM0, RXF0, RXF1);
+  CANFilterOpt filters;
+  filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
   canControl.Setup(filters, &errorFlags);
   
