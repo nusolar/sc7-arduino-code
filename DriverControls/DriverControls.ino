@@ -322,6 +322,7 @@ void setup() {
 
 void loop() {
   // clear watchdog timer
+  WDT_Restart(WDT);
   
   // read GPIO
   readInputs();
