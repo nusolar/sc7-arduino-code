@@ -8,52 +8,55 @@
 #include <Metro.h>
 #include <SPI.h>
 #include "sc7-can-libinclude.h"
-//#include "WDT.h"
 
 //------------------------------CONSTANTS----------------------------//
 // pins
-const byte BRAKE_PIN = 0;
-const byte ACCEL_PIN = 0;
-const byte REGEN_PIN = 0;
+const byte BRAKE_PIN     = 0;
+const byte ACCEL_PIN     = 0;
+const byte REGEN_PIN     = 0;
 const byte INTERRUPT_PIN = 0;
-const byte CS_PIN = 0;
-const byte ERROR_PIN = 13;
+const byte CS_PIN        = 0;
+const byte HORN_PIN      = 0;
+const byte RT_PIN        = 0;
+const byte LT_PIN        = 0;
+const byte HEADLIGHT_PIN = 0;
+const byte ERROR_PIN     = 13;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
-const byte FREQ = 16;
-const uint16_t RXM0 = MASK_NONE;
-const uint16_t RXM1 = MASK_NONE;
-const uint16_t RXF0 = MASK_NONE;
-const uint16_t RXF1 = MASK_NONE;
-const uint16_t RXF2 = MASK_NONE;
-const uint16_t RXF3 = MASK_NONE;
-const uint16_t RXF4 = MASK_NONE;
-const uint16_t RXF5 = MASK_NONE;
+const byte     FREQ      = 16;
+const uint16_t RXM0      = MASK_NONE;
+const uint16_t RXM1      = MASK_NONE;
+const uint16_t RXF0      = MASK_NONE;
+const uint16_t RXF1      = MASK_NONE;
+const uint16_t RXF2      = MASK_NONE;
+const uint16_t RXF3      = MASK_NONE;
+const uint16_t RXF4      = MASK_NONE;
+const uint16_t RXF5      = MASK_NONE;
 
 // timer intervals (all in ms)
-const uint16_t MC_HB_INTERVAL = 1000; // motor controller heartbeat
-const uint16_t SW_HB_INTERVAL = 1000; // steering wheel heartbeat
-const uint16_t BMS_HB_INTERVAL = 1000; // bms heartbeat
-const uint16_t MC_SEND_INTERVAL = 1000; // motor controller send packet
+const uint16_t MC_HB_INTERVAL    = 1000; // motor controller heartbeat
+const uint16_t SW_HB_INTERVAL    = 1000; // steering wheel heartbeat
+const uint16_t BMS_HB_INTERVAL   = 1000; // bms heartbeat
+const uint16_t MC_SEND_INTERVAL  = 1000; // motor controller send packet
 const uint16_t BMS_SEND_INTERVAL = 1000; // bms send packet
-const uint16_t SW_SEND_INTERVAL = 1000; // steering wheel send packet
-const uint16_t DC_SEND_INTERVAL = 1000; // driver controls heartbeat
-const uint16_t WDT_INTERVAL = 5000; // watchdog timer
+const uint16_t SW_SEND_INTERVAL  = 1000; // steering wheel send packet
+const uint16_t DC_SEND_INTERVAL  = 1000; // driver controls heartbeat
+const uint16_t WDT_INTERVAL      = 1000; // watchdog timer
 
 // drive parameters
-const uint16_t MAX_ACCEL_VOLTAGE = 1024; // max possible accel voltage
-const float MAX_ACCEL_RATIO = 0.8; // maximum safe accel ratio
-const uint16_t MAX_REGEN_VOLTAGE = 1024; // max possible regen voltage
-const float MAX_REGEN_RATIO = 1.0; // maximum safe regen ratio
-const float MIN_PEDAL_TOLERANCE = 0.05; // anything less is basically zero
-const float FORWARD_VELOCITY = 100.0f; // velocity to use if forward
-const float REVERSE_VELOCITY = -100.0f; // velocity to use if reverse
+const uint16_t MAX_ACCEL_VOLTAGE  = 1024; // max possible accel voltage
+const float MAX_ACCEL_RATIO       = 0.8; // maximum safe accel ratio
+const uint16_t MAX_REGEN_VOLTAGE  = 1024; // max possible regen voltage
+const float MAX_REGEN_RATIO       = 1.0; // maximum safe regen ratio
+const float MIN_PEDAL_TOLERANCE   = 0.05; // anything less is basically zero
+const float FORWARD_VELOCITY      = 100.0f; // velocity to use if forward
+const float REVERSE_VELOCITY      = -100.0f; // velocity to use if reverse
 
 // driver control errors
-const uint16_t MC_TIMEOUT = 0x0001; // motor controller timed out
+const uint16_t MC_TIMEOUT  = 0x0001; // motor controller timed out
 const uint16_t BMS_TIMEOUT = 0x0002; // bms timed out
-const uint16_t SW_TIMEOUT = 0x0004; // sw timed out
+const uint16_t SW_TIMEOUT  = 0x0004; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x0008; // bad gearing from steering wheel
 
 //----------------------------TYPE DEFINITIONS------------------------//
@@ -114,7 +117,6 @@ Metro mcSendTimer(MC_SEND_INTERVAL); // motor controller send packet
 Metro swSendTimer(SW_SEND_INTERVAL); // steering wheel send packet
 Metro bmsSendTimer(BMS_SEND_INTERVAL); // bms send packet
 Metro dcSendTimer(DC_SEND_INTERVAL); // driver controls heartbeat
-//WDT wdt; // watchdog timer
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -137,6 +139,7 @@ void readCAN() {
     Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
+    // first three digits will be exactly equal to heartbeat ids
     if ((f.id & MASK_Sx00) == BMS_HEARTBEAT_ID) { // source is bms
       bmsHbTimer.reset();
     }
@@ -236,12 +239,10 @@ void updateState() {
  */
 void writeOutputs() {
   // check for errors
-  if (state.canErrorFlags || state.dcErrorFlags) { // error exists
-    digitalWrite(ERROR_PIN, HIGH);
-  }
-  else { // no error
-    digitalWrite(ERROR_PIN, LOW);
-  }
+  digitalWrite(ERROR_PIN, (state.canErrorFlags || state.dcErrorFlags) ? HIGH : LOW);
+  
+  // write horn
+  digitalWrite(HORN_PIN, state.hornEngaged ? HIGH : LOW);
 }
 
 /*
@@ -273,8 +274,7 @@ void writeCAN() {
     }
     
     // create and send packet
-    DC_Drive packet(velocity, current);
-    canControl.Send(packet, TXB0);
+    canControl.Send(DC_Drive(velocity, current), TXB0);
     
     // reset timer
     mcSendTimer.reset();
@@ -283,8 +283,7 @@ void writeCAN() {
   // check if driver controls heartbeat needs to be sent
   if (dcSendTimer.check()) {
     // create and send packet
-    DC_Heartbeat packet(0,0);
-    canControl.Send(packet, TXB0);
+    canControl.Send(DC_Heartbeat(0,0), TXB0);
     
     // reset timer
     dcSendTimer.reset();
@@ -296,6 +295,7 @@ void setup() {
   // setup pin I/O
   pinMode(BRAKE_PIN, INPUT_PULLUP);
   pinMode(ERROR_PIN, OUTPUT);
+  pinMode(HORN_PIN, OUTPUT);
   
   // setup CAN
   CANFilterOpt filters;
@@ -329,6 +329,9 @@ void loop() {
   
   // read CAN
   readCAN();
+  
+  // clear watchdog timer
+  WDT_Restart(WDT);
   
   // check timers
   checkTimers();
