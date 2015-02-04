@@ -221,16 +221,16 @@ void updateState() {
                                MAX_REGEN_RATIO);
   
   // update gear state
-  if (state.brakeEngaged) { // brake engaged, overrides all other gears
+  if (state.brakeEngaged) {                           // brake engaged, overrides all other gears
     state.gear = BRAKE;
   }
-  else if (state.accelRatio > MIN_PEDAL_TOLERANCE) { // accel engaged
-                                                     // overrides regen
-    state.gear = (state.gearForward ? FORWARD : REVERSE);
-  }
-  else if (state.regenRatio > MIN_PEDAL_TOLERANCE) { // regen engaged
+  else if (state.regenRatio > MIN_PEDAL_TOLERANCE) {  // regen engaged
     state.gear = REGEN;
   }
+  else {                                              // accel or nothing engaged
+    state.gear = (state.gearForward ? FORWARD : REVERSE);
+  }
+  
   // if no pedal engaged, gear state unchanged
 }
 
