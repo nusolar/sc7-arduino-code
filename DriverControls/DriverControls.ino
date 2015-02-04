@@ -11,7 +11,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // id
- const uint16_t DC_ID         = 0x00C6 // For SC6
+ const uint16_t DC_ID         = 0x00C7 // For SC7
  const uint16_t DC_SER_NO     = 0x0042 // Don't panic!
 
 // pins
