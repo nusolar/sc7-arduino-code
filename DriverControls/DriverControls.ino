@@ -10,6 +10,10 @@
 #include "sc7-can-libinclude.h"
 
 //------------------------------CONSTANTS----------------------------//
+// id
+ const uint16_t DC_ID         = 0x00C6 // For SC6
+ const uint16_t DC_SER_NO     = 0x0042 // Don't panic!
+
 // pins
 const byte BRAKE_PIN     = 0;
 const byte ACCEL_PIN     = 0;
@@ -230,8 +234,6 @@ void updateState() {
   else {                                              // accel or nothing engaged
     state.gear = (state.gearForward ? FORWARD : REVERSE);
   }
-  
-  // if no pedal engaged, gear state unchanged
 }
 
 /*
@@ -253,28 +255,28 @@ void writeCAN() {
   // see if motor controller packet needs to be sent
   if (mcSendTimer.check()) { // ready to send drive command
     // determine velocity, current
-    float velocity, current;
+    float MCvelocity, MCcurrent;
     switch (state.gear) {
     case FORWARD:
-      velocity = FORWARD_VELOCITY;
-      current = state.accelRatio;
+      MCvelocity = FORWARD_VELOCITY;                                               // Target Vel = 100 mph
+      MCcurrent = (state.accelRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.accelRatio; // Set current to acceleration value unless below tolerance
       break;
     case REVERSE:
-      velocity = REVERSE_VELOCITY;
-      current = state.accelRatio;
+      MCvelocity = REVERSE_VELOCITY;                                               // Target Vel = -100 mph
+      MCcurrent = (state.accelRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.accelRatio; // Set current to acceleration value unless below tolerance
       break;
     case REGEN:
-      velocity = 0;
-      current = state.regenRatio;
+      MCvelocity = 0;                                                              // Target Vel = 0 mph for regen
+      MCcurrent = (state.regenRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.regenRatio; // Set current to acceleration value unless below tolerance
       break;
     case BRAKE:
-      velocity = 0;
-      current = 0;
+      MCvelocity = 0;                                                              // Do REGEN while braking
+      MCcurrent = MAX_REGEN_RATIO;
       break;
     }
     
     // create and send packet
-    canControl.Send(DC_Drive(velocity, current), TXB0);
+    canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXB0);
     
     // reset timer
     mcSendTimer.reset();
@@ -283,10 +285,10 @@ void writeCAN() {
   // check if driver controls heartbeat needs to be sent
   if (dcSendTimer.check()) {
     // create and send packet
-    canControl.Send(DC_Heartbeat(0,0), TXB0);
+    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB0);
     
     // reset timer
-    dcSendTimer.reset();
+    dcSendTimer.reset(); 
   }
 }
 
