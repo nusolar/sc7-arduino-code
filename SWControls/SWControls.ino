@@ -1,5 +1,8 @@
- #include <Metro.h>
- #inclue <sc7-can-libinclude.h>
+#include <Metro.h>
+
+#include <SPI.h>
+
+#include <sc7-can-libinclude.h>
  
  #define BIT(n)                  ( 1<<(n) ) 
  #define BIT_SET(y, mask)        ( y |=  (mask) ) 
