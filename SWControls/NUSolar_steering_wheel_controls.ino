@@ -92,6 +92,7 @@ void loop() {
 /*if the metro timer runs out, then check the states of all the switches
     assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check() == 1){
+    old = young; // Store old switch values.
     setyoungbit(fgp,  young,FWD_GEAR);
     setyoungbit(rgp,  young,REV_GEAR);
     setyoungbit(hp,	  young,HEADLIGHT);
@@ -125,6 +126,12 @@ void loop() {
     
   /*elseIf CAN_TX timer runs out, send CAN packet in the form of the setup byte variable
     and reset CAN_TX timer*/
+
+  /* Write to serial for testing */
+  if (young != old || CAN_TX.check())
+  {
+	Serial.write(young,BIN);
+  }
 
 }                       
 
