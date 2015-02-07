@@ -3,10 +3,12 @@
 
 #include <SPI.h>
  
- #define BIT(n)                  ( 1<<(n) ) 
- #define BIT_SET(y, mask)        ( y |=  (mask) ) 
- #define BIT_CLEAR(y, mask)      ( y &= ~(mask) ) 
- #define BIT_FLIP(y, mask)       ( y ^=  (mask) )
+ #define BIT(n)                   ( 1<<(n) ) 
+ #define BIT_SET(y, mask)         ( y |=  (mask) ) 
+ #define BIT_CLEAR(y, mask)       ( y &= ~(mask) ) 
+ #define BIT_FLIP(y, mask)        ( y ^=  (mask) )
+ #define BIT_DIFFERENT(y, x, mask)( y & mask == x & mask )
+ #define BIT_CHECK(y, bit, mask)  ( BIT_DIFFERENT(young, (bit)*mask, mask) )
 
 /* Bit masks */
 #define FWD_GEAR BIT(0)
@@ -29,13 +31,19 @@ byte old;
    const int hornp =  3;
    const int ltp =    4;
    const int rtp =    5;
+   
+//system variables
+  byte cc_switch_state_old = 1; // Old switch state of the cruise control bit
+  byte cc_switch_state     = 1; // Switch state of the cruise control bit
 
 //set up metro timer
   //1st: switch state reading timer
   Metro switch_timer = Metro(20);
-  //2nd: CAN Transmission timer
+  //2nd: switch state reading timer
+  Metro cc_debounce_timer = Metro(5);
+  //3rd: CAN Transmission timer
   Metro CAN_TX = Metro(1000);
-  //3rd: CAN Reception timer
+  //4th: CAN Reception timer
   //Metro CAN_RX = Metro(1000);
 
 
@@ -90,7 +98,7 @@ inline void setyoungbit(byte pin, byte& out, byte mask){
   }
 }
 
-void loop() {    
+void loop() {  
 /*if the metro timer runs out, then check the states of all the switches
     assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check() == 1){
@@ -99,10 +107,24 @@ void loop() {
     setyoungbit(rgp,  young,REV_GEAR);
     setyoungbit(hp,   young,HEADLIGHT);
     setyoungbit(hzp,  young,HAZARDLIGHT);
-    setyoungbit(ccp,  young,CRUISE_CONTROL);
     setyoungbit(hornp,young,HORN);
     setyoungbit(ltp,  young,LEFT_TURN);
     setyoungbit(rtp,  young,RIGHT_TURN);
+    
+    //Check cruise control bit
+    if (digitalRead(ccp) == 0 && cc_switch_state_old == 1)
+    {
+       cc_debounce_timer.reset();
+       cc_switch_state = 0;
+    }
+    
+    if (cc_debounce_timer.check() && cc_switch_state_old == 1)
+    {  
+       if (cc_switch_state == 0)
+       {  BIT_FLIP(young, CRUISE_CONTROL); }
+       cc_switch_state_old = cc_switch_state;
+    }
+      
     switch_timer.reset();
   }
     //   ^ if (digtalRead(fgp)) 
