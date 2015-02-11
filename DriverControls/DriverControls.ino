@@ -15,9 +15,9 @@
  const uint16_t DC_SER_NO     = 0x0042; // Don't panic!
 
 // pins
-const byte BRAKE_PIN     = 0;
-const byte ACCEL_PIN     = 0;
-const byte REGEN_PIN     = 0;
+const byte BRAKE_PIN     = 44;
+const byte ACCEL_PIN     = 4;
+const byte REGEN_PIN     = 3;
 const byte INTERRUPT_PIN = 5;
 const byte CS_PIN        = 4;
 const byte HORN_PIN      = 0;
@@ -278,7 +278,7 @@ void writeCAN() {
   // check if driver controls heartbeat needs to be sent
   if (dcSendTimer.check()) {
     // create and send packet
-    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB0);
+    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB1);
     
     // reset timer
     dcSendTimer.reset(); 
@@ -313,6 +313,9 @@ void setup() {
   swSendTimer.reset();
   bmsSendTimer.reset();
   dcSendTimer.reset();
+  
+  // debugging
+  Serial.begin(9600);
 }
 
 void loop() {
@@ -342,4 +345,37 @@ void loop() {
   
   // write CAN
   writeCAN();
+  
+  // debugging
+  Serial.print("Brake pin: ");
+  Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
+  Serial.print("Accel pedal raw: ");
+  Serial.println(state.accelRaw);
+  Serial.print("Regen pedal raw: ");
+  Serial.println(state.regenRaw);
+  Serial.print("Accel ratio: ");
+  Serial.println(state.accelRatio);
+  Serial.print("Regen ratio: ");
+  Serial.println(state.regenRatio);
+  Serial.print("Gear: ");
+  switch (state.gear) {
+  case BRAKE:
+    Serial.println("BRAKE");
+    break;
+  case FORWARD:
+    Serial.println("FORWARD");
+    break;
+  case REVERSE:
+    Serial.println("REVERSE");
+    break;
+  case REGEN:
+    Serial.println("REGEN");
+    break;
+  }
+  Serial.print("CAN error: ");
+  Serial.println(state.canErrorFlags);
+  Serial.print("Board error: ");
+  Serial.println(state.dcErrorFlags);
+  Serial.println('\n');
+  delay(100);
 }
