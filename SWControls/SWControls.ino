@@ -43,8 +43,8 @@ byte old;
 
 
 // CAN parameters
-const byte	   CAN_CS 	 = 4;
-const byte	   CAN_INT	 = 5;
+const byte	   CAN_CS 	 = 10;
+const byte	   CAN_INT	 = 2;
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
 const uint16_t RXM0      = MASK_NONE;
@@ -85,7 +85,7 @@ SPDT - forward/neutral/reverse, headlight/no light/hazard*/
     CANFilterOpt filter;
     filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
     filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
-    canControl.Setup(filter, &CAN_errors);
+    CanControl.Setup(filter, &CAN_errors);
 
 }
 
@@ -152,7 +152,8 @@ void loop() {
   /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
   if(young != old || CAN_TX.check()){
-    CanControl.Send(SW_Data(young));
+    Serial.print(CAN_errors,BIN);
+    CanControl.Send(SW_Data(young),TXB0);
     CAN_TX.reset();
   }
 
@@ -166,7 +167,5 @@ void loop() {
 //  {
 //    Serial.println(young,BIN);
 //        old = young;
-  }
-
-}                       
+  }                
 
