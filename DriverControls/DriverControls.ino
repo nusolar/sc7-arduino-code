@@ -11,15 +11,15 @@
 
 //------------------------------CONSTANTS----------------------------//
 // id
- const uint16_t DC_ID         = 0x00C7 // For SC7
- const uint16_t DC_SER_NO     = 0x0042 // Don't panic!
+ const uint16_t DC_ID         = 0x00C7; // For SC7
+ const uint16_t DC_SER_NO     = 0x0042; // Don't panic!
 
 // pins
 const byte BRAKE_PIN     = 0;
 const byte ACCEL_PIN     = 0;
 const byte REGEN_PIN     = 0;
-const byte INTERRUPT_PIN = 0;
-const byte CS_PIN        = 0;
+const byte INTERRUPT_PIN = 5;
+const byte CS_PIN        = 4;
 const byte HORN_PIN      = 0;
 const byte RT_PIN        = 0;
 const byte LT_PIN        = 0;
@@ -169,20 +169,13 @@ void readCAN() {
       state.bmsPercentSOC = packet.percent_SOC;
     }
     else if (f.id == SW_DATA_ID) { // steering wheel data
-      /*
       SW_Data packet(f);
       
       // get gear info
-      if (packet.gear_forward == packet.gear_reverse) { // bad gear
-        state.dcErrorFlags |= SW_BAD_GEAR; // update error flags
-      }
-      else { // gear ok
-        state.gearForward = packet.gear_forward;
-      }
+      state.gearForward = (packet.gear & 0x01);
       
       // get other info
       state.hornEngaged = packet.horn;
-      */
     }  
   }
 }
@@ -225,13 +218,13 @@ void updateState() {
                                MAX_REGEN_RATIO);
   
   // update gear state
-  if (state.brakeEngaged) {                           // brake engaged, overrides all other gears
+  if (state.brakeEngaged) { // brake engaged, overrides all other gears
     state.gear = BRAKE;
   }
   else if (state.regenRatio > MIN_PEDAL_TOLERANCE) {  // regen engaged
     state.gear = REGEN;
   }
-  else {                                              // accel or nothing engaged
+  else { // accel or nothing engaged
     state.gear = (state.gearForward ? FORWARD : REVERSE);
   }
 }
