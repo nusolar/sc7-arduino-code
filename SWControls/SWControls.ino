@@ -1,5 +1,6 @@
 #include "sc7-can-libinclude.h"
 #include <Metro.h>
+#include <Switch.h>
 
 #include <SPI.h>
  
@@ -23,27 +24,21 @@ byte young;
 byte old;
 
 //set up pins that connect to switch terminals
-   const int fgp =   12;
-   const int rgp =   11;
-   const int hp =    10;
-   const int hzp =    9;
-   const int ccp =    2;
-   const int hornp =  3;
-   const int ltp =    4;
-   const int rtp =    5;
-   
-//system variables
-  byte cc_switch_state_old = 1; // Old switch state of the cruise control bit
-  byte cc_switch_state     = 1; // Switch state of the cruise control bit
+   const int fgp =   9;
+   const int rgp =   8;
+   const int hp =    7;
+   const int hzp =   6;
+   const int ccp =   3;
+   const int hornp = 2;
+   const int ltp =   4;
+   const int rtp =   5;
 
 //set up metro timer
   //1st: switch state reading timer
   Metro switch_timer = Metro(20);
-  //2nd: switch state reading timer
-  Metro cc_debounce_timer = Metro(5);
-  //3rd: CAN Transmission timer
+  //2nd: CAN Transmission timer
   Metro CAN_TX = Metro(1000);
-  //4th: CAN Reception timer
+  //3rd: CAN Reception timer
   //Metro CAN_RX = Metro(1000);
 
 
@@ -62,7 +57,12 @@ const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
       uint16_t CAN_errors;
       
-CAN_IO canControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
+CAN_IO CanControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
+
+Switch cruisecontrol(ccp);
+Switch horn(hornp);
+
+boolean cruisecontroltoggle = false;
 
  void setup() {
    // Pin Modes
@@ -98,64 +98,74 @@ inline void setyoungbit(byte pin, byte& out, byte mask){
   }
 }
 
+inline void setyoungbitspecial(byte pin1, byte pin2, byte& out, byte mask1, byte mask2){
+  if ((digitalRead(pin1) == 1)&&(digitalRead(pin2) == 1)){
+    BIT_CLEAR(out,mask1);
+    BIT_CLEAR(out,mask2);
+  }
+  else if ((digitalRead(pin1) == 0)&&(digitalRead(pin2) == 1)){
+    BIT_SET(out,mask2);
+    BIT_CLEAR(out,mask1);
+  }
+  else if ((digitalRead(pin1) == 1)&&(digitalRead(pin2) == 0)){
+    BIT_SET(out,mask1);
+    BIT_CLEAR(out,mask2);
+  }
+}
+
+//inline void setyoungbitbutton(byte pin, byte& out, byte mask){
+//  button.poll();
+//  
+//}
+
 void loop() {  
 /*if the metro timer runs out, then check the states of all the switches
     assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check() == 1){
     old = young; // Store old switch values.
-    setyoungbit(fgp,  young,FWD_GEAR);
-    setyoungbit(rgp,  young,REV_GEAR);
-    setyoungbit(hp,   young,HEADLIGHT);
-    setyoungbit(hzp,  young,HAZARDLIGHT);
-    setyoungbit(hornp,young,HORN);
+    setyoungbitspecial(fgp,rgp,young,FWD_GEAR,REV_GEAR);
+    setyoungbitspecial(hp,hzp,young,HEADLIGHT,HAZARDLIGHT);
     setyoungbit(ltp,  young,LEFT_TURN);
     setyoungbit(rtp,  young,RIGHT_TURN);
-    
-    //Check cruise control bit
-    if (digitalRead(ccp) == 0 && cc_switch_state_old == 1)
-    {
-       cc_debounce_timer.reset();
-       cc_switch_state = 0;
+    cruisecontrol.poll();
+    if(cruisecontrol.pushed()){
+      if(cruisecontroltoggle == true){
+        cruisecontroltoggle = false;
+        BIT_CLEAR(young,CRUISE_CONTROL);
+      }
+      else{
+        cruisecontroltoggle == true;
+        BIT_SET(young,CRUISE_CONTROL);
+      }
     }
-    
-    if (cc_debounce_timer.check() && cc_switch_state_old == 1)
-    {  
-       if (cc_switch_state == 0)
-       {  BIT_FLIP(young, CRUISE_CONTROL); }
-       cc_switch_state_old = cc_switch_state;
+    horn.poll();
+    if(horn.pushed()){
+      BIT_SET(young,HORN);
     }
-      
+    else if(horn.released()){
+      BIT_CLEAR(young,HORN);
+    }
+
     switch_timer.reset();
   }
-    //   ^ if (digtalRead(fgp)) 
-//    {BIT_SET(status, FWD_GEAR);}
-//    else
-//    {BIT_CLEAR(status,FWD_GEAR);}
-//    reverse_gear = digitalRead(rgp);
-//    headlights = digitalRead(hp);
-//    hazardlights = digitalRead(hzp);
-//    cruise_control = digitalRead(ccp);
-//    horn = digitalRead(hornp);
-//    left_turn = digitalRead(ltp);
-//    right_turn = digitalRead(rtp);
-    
-  /*If this byte is different from the one in the void setup(), send CAN packet
-    , reassign the new values to the initial bit flags in the setup byte variable
+  
+  /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
+  if(young != old || CAN_TX.check()){
+    CanControl.Send(SW_Data(young));
+    CAN_TX.reset();
+  }
 
     // Call CanControl.Send(Layout); to send a packet
     // Call CanControl.Available();  to check whether a packet is received
     // Frame& f = CanControl.Read(); to get a frame from the queue.
     // DC_Steering packet(f); 		 to convert it to a specific Layout.
-    
-  /*elseIf CAN_TX timer runs out, send CAN packet in the form of the setup byte variable
-    and reset CAN_TX timer*/
 
-  /* Write to serial for testing */
-  if (young != old || CAN_TX.check())
-  {
-	Serial.println(young,BIN);
-        old = young;
+//  /* Write to serial for testing */
+//  if (young != old || CAN_TX.check())
+//  {
+//    Serial.println(young,BIN);
+//        old = young;
   }
 
 }                       
