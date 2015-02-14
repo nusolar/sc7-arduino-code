@@ -11,6 +11,9 @@
 
 //------------------------------CONSTANTS----------------------------//
 
+// debugging
+const bool DEBUG = false; // change to true to output debug info over serial
+
 // pins
 const byte BRAKE_PIN     = 44;
 const byte ACCEL_PIN     = 4;
@@ -184,7 +187,7 @@ void readCAN() {
  */
 void checkTimers() {
   if (mcHbTimer.check()) { // motor controller timeout
-    state.dcErrorFlags |= MC_TIMEOUT;
+    state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
   if (bmsHbTimer.check()) {
     state.dcErrorFlags |= BMS_TIMEOUT;
@@ -327,7 +330,9 @@ void setup() {
   dcHbTimer.reset();
   
   // debugging
-  Serial.begin(9600);
+  if (DEBUG) {
+    Serial.begin(9600);
+  }
 }
 
 void loop() {
@@ -359,38 +364,40 @@ void loop() {
   writeCAN();
   
   // debugging
-  Serial.print("Brake pin: ");
-  Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
-  Serial.print("Accel pedal raw: ");
-  Serial.println(state.accelRaw);
-  Serial.print("Regen pedal raw: ");
-  Serial.println(state.regenRaw);
-  Serial.print("Accel ratio: ");
-  Serial.println(state.accelRatio);
-  Serial.print("Regen ratio: ");
-  Serial.println(state.regenRatio);
-  Serial.print("Gear: ");
-  switch (state.gear) {
-  case BRAKE:
-    Serial.println("BRAKE");
-    break;
-  case FORWARD:
-    Serial.println("FORWARD");
-    break;
-  case REVERSE:
-    Serial.println("REVERSE");
-    break;
-  case REGEN:
-    Serial.println("REGEN");
-    break;
-  case NEUTRAL:
-    Serial.println("NEUTRAL");
-    break;
+  if (DEBUG) {
+    Serial.print("Brake pin: ");
+    Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
+    Serial.print("Accel pedal raw: ");
+    Serial.println(state.accelRaw);
+    Serial.print("Regen pedal raw: ");
+    Serial.println(state.regenRaw);
+    Serial.print("Accel ratio: ");
+    Serial.println(state.accelRatio);
+    Serial.print("Regen ratio: ");
+    Serial.println(state.regenRatio);
+    Serial.print("Gear: ");
+    switch (state.gear) {
+    case BRAKE:
+      Serial.println("BRAKE");
+      break;
+    case FORWARD:
+      Serial.println("FORWARD");
+      break;
+    case REVERSE:
+      Serial.println("REVERSE");
+      break;
+    case REGEN:
+      Serial.println("REGEN");
+      break;
+    case NEUTRAL:
+      Serial.println("NEUTRAL");
+      break;
+    }
+    Serial.print("CAN error: ");
+    Serial.println(state.canErrorFlags);
+    Serial.print("Board error: ");
+    Serial.println(state.dcErrorFlags);
+    Serial.println('\n');
+    delay(100);
   }
-  Serial.print("CAN error: ");
-  Serial.println(state.canErrorFlags);
-  Serial.print("Board error: ");
-  Serial.println(state.dcErrorFlags);
-  Serial.println('\n');
-  delay(100);
 }
