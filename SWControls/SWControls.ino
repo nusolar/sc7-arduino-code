@@ -1,6 +1,7 @@
 #include "sc7-can-libinclude.h"
 #include <Metro.h>
 #include <Switch.h>
+#include <serLCD.h>
 
 #include <SPI.h>
  
@@ -39,7 +40,7 @@ byte old;
   //2nd: CAN Transmission timer
   Metro CAN_TX = Metro(1000);
   //3rd: CAN Reception timer
-  //Metro CAN_RX = Metro(1000);
+  Metro CAN_RX = Metro(1000);
 
 
 // CAN parameters
@@ -64,29 +65,34 @@ Switch horn(hornp);
 
 boolean cruisecontroltoggle = false;
 
- void setup() {
-   // Pin Modes
-  	pinMode(fgp, INPUT_PULLUP);
-	pinMode(rgp, INPUT_PULLUP);
-	pinMode(hp, INPUT_PULLUP);
-	pinMode(hzp, INPUT_PULLUP);
-	pinMode(ccp, INPUT_PULLUP);
-	pinMode(hornp, INPUT_PULLUP);
-	pinMode(ltp, INPUT_PULLUP);
-	pinMode(rtp, INPUT_PULLUP);
+serLCD screen(Serial1);
+
+void setup() {
+  // Pin Modes
+  pinMode(fgp, INPUT_PULLUP);
+  pinMode(rgp, INPUT_PULLUP);
+  pinMode(hp, INPUT_PULLUP);
+  pinMode(hzp, INPUT_PULLUP);
+  pinMode(ccp, INPUT_PULLUP);
+  pinMode(hornp, INPUT_PULLUP);
+  pinMode(ltp, INPUT_PULLUP);
+  pinMode(rtp, INPUT_PULLUP);
 
 /*SPST - left turn, right turn, horn, cruise control
 SPDT - forward/neutral/reverse, headlight/no light/hazard*/
 
-	//set Serial baud rate to 9600bps
-	Serial.begin(9600);
+  //set Serial baud rate to 9600bps
+  Serial.begin(9600);
 
-	//CAN setup
-    CANFilterOpt filter;
-    filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
-    filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
-    CanControl.Setup(filter, &CAN_errors);
-
+  //CAN setup
+  CANFilterOpt filter;
+  filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
+  filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
+  CanControl.Setup(filter, &CAN_errors);
+  
+  screen.begin();
+  screen.clear();
+  screen.setBrightness(25);
 }
 
 inline void setyoungbit(byte pin, byte& out, byte mask){
@@ -138,7 +144,7 @@ void loop() {
         BIT_SET(young,CRUISE_CONTROL);
       }
       else{
-        cruisecontroltoggle == true;
+        cruisecontroltoggle = true;
         BIT_CLEAR(young,CRUISE_CONTROL);
       }
     }
@@ -164,6 +170,22 @@ void loop() {
     old = young;
   }
 
+  if (can.Available()){
+    Frame&f = can.Read();
+    if (f.id == MC_BUS_STATUS_ID){
+      MC_BusStatus received(f);
+      float current = received.bus_current;
+      screen.selectLine(1);
+      screen.print("MC Bus Current: ");
+      screen.selectLine(2);
+      screen.print(current);
+      CAN_RX.reset();
+    }
+    else if (f.id == 
+    
+    DC_Steering received(f);
+    
+    
     // Call CanControl.Send(Layout); to send a packet
     // Call CanControl.Available();  to check whether a packet is received
     // Frame& f = CanControl.Read(); to get a frame from the queue.
