@@ -11,7 +11,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = false; // change to true to output debug info over serial
+const bool DEBUG = true; // change to true to output debug info over serial
 
 // pins
 const byte BRAKE_PIN      = 44;
@@ -19,11 +19,11 @@ const byte ACCEL_PIN      = 4;
 const byte REGEN_PIN      = 3;
 const byte INTERRUPT_PIN  = 5;
 const byte CS_PIN         = 4;
-const byte HORN_PIN       = 0;
-const byte RIGHT_TURN_PIN = 0;
-const byte LEFT_TURN_PIN  = 0;
-const byte HEADLIGHT_PIN  = 0;
-const byte BRAKELIGHT_PIN = 0;
+const byte HORN_PIN       = 6;
+const byte RIGHT_TURN_PIN = 7;
+const byte LEFT_TURN_PIN  = 8;
+const byte HEADLIGHT_PIN  = 9;
+const byte BRAKELIGHT_PIN = 10;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -65,10 +65,10 @@ const byte GEAR_REVERSE = 0x2;
 const byte SW_ON_BIT    = 1;   // value that corresponds to on for steering wheel data
 
 // driver control errors
-const uint16_t MC_TIMEOUT  = 0x0001; // motor controller timed out
-const uint16_t BMS_TIMEOUT = 0x0002; // bms timed out
-const uint16_t SW_TIMEOUT  = 0x0004; // sw timed out
-const uint16_t SW_BAD_GEAR = 0x0008; // bad gearing from steering wheel
+const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
+const uint16_t BMS_TIMEOUT = 0x02; // bms timed out
+const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
+const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
 
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
@@ -118,7 +118,7 @@ struct CarState {
   
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
-  uint16_t dcErrorFlags; // keep track of other errors
+  byte dcErrorFlags;      // keep track of other errors
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -138,6 +138,10 @@ Metro dcHbTimer(DC_HB_INTERVAL);       // driver controls heartbeat
 Metro hazardsTimer(TOGGLE_INTERVAL);   // timer for toggling hazards
 Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
+
+// debugging
+int debugStartTime = 0;
+int debugEndTime = 0;
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -357,6 +361,8 @@ void writeCAN() {
     dcDriveTimer.reset();
   }
   
+  delay(10);
+  
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
     // create and send packet
@@ -364,6 +370,18 @@ void writeCAN() {
     
     // reset timer
     dcHbTimer.reset(); 
+  }
+  
+  delay(10);
+  
+  // check if driver controls info packet needs to be sent
+  if (dcInfoTimer.check()) {
+    // create and send packet
+    canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
+                            state.canErrorFlags, state.dcErrorFlags), TXB2);
+    
+    // reset timer
+    dcInfoTimer.reset();
   }
 }
 
@@ -382,7 +400,7 @@ void setup() {
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
   canControl.Setup(filters, &state.canErrorFlags);
-  
+
   // init car state
   state = {}; // init all members to 0
   state.gear = NEUTRAL;
@@ -404,7 +422,7 @@ void setup() {
   }
 }
 
-void loop() {
+void loop() {  
   // clear watchdog timer
   WDT_Restart(WDT);
   
@@ -434,6 +452,12 @@ void loop() {
   
   // debugging
   if (DEBUG) {
+    debugStartTime = millis();
+
+    Serial.print("Loop time: ");
+    Serial.println(debugStartTime - debugEndTime);
+    Serial.print("System time: ");
+    Serial.println(millis());
     Serial.print("Brake pin: ");
     Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
     Serial.print("Accel pedal raw: ");
@@ -478,7 +502,12 @@ void loop() {
     Serial.println(state.canErrorFlags);
     Serial.print("Board error: ");
     Serial.println(state.dcErrorFlags);
-    Serial.println('\n');
+    Serial.print("System time: ");
+    Serial.println(millis());
+    Serial.println();
+    
+    debugEndTime = millis();
+    
     delay(1000);
   }
 }
