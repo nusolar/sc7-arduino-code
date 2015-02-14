@@ -20,7 +20,7 @@
 #define HORN BIT(5)
 #define LEFT_TURN BIT(6)
 #define RIGHT_TURN BIT(7)
-byte young;
+byte young = 1;
 byte old;
 
 //set up pins that connect to switch terminals
@@ -29,7 +29,7 @@ byte old;
    const int hp =    7;
    const int hzp =   6;
    const int ccp =   3;
-   const int hornp = 2;
+   const int hornp = 10;
    const int ltp =   4;
    const int rtp =   5;
 
@@ -43,8 +43,8 @@ byte old;
 
 
 // CAN parameters
-const byte	   CAN_CS 	 = 10;
-const byte	   CAN_INT	 = 2;
+const byte	   CAN_CS 	 = A0;
+const byte	   CAN_INT	 = 1;
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
 const uint16_t RXM0      = MASK_NONE;
@@ -123,49 +123,49 @@ void loop() {
     assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check() == 1){
     old = young; // Store old switch values.
-    setyoungbitspecial(fgp,rgp,young,FWD_GEAR,REV_GEAR);
-    setyoungbitspecial(hp,hzp,young,HEADLIGHT,HAZARDLIGHT);
+    setyoungbit(fgp,  young,FWD_GEAR);
+    setyoungbit(rgp,  young,REV_GEAR);
+    setyoungbit(hp,   young,HEADLIGHT);
+    setyoungbit(hzp,  young,HAZARDLIGHT);
+    //setyoungbitspecial(fgp,rgp,young,FWD_GEAR,REV_GEAR);
+    //setyoungbitspecial(hp,hzp,young,HEADLIGHT,HAZARDLIGHT);
     setyoungbit(ltp,  young,LEFT_TURN);
     setyoungbit(rtp,  young,RIGHT_TURN);
     cruisecontrol.poll();
     if(cruisecontrol.pushed()){
       if(cruisecontroltoggle == true){
         cruisecontroltoggle = false;
-        BIT_CLEAR(young,CRUISE_CONTROL);
+        BIT_SET(young,CRUISE_CONTROL);
       }
       else{
         cruisecontroltoggle == true;
-        BIT_SET(young,CRUISE_CONTROL);
+        BIT_CLEAR(young,CRUISE_CONTROL);
       }
     }
+    
     horn.poll();
-    if(horn.pushed()){
-      BIT_SET(young,HORN);
-    }
-    else if(horn.released()){
+    if(horn.on()){
       BIT_CLEAR(young,HORN);
     }
-
+    else {
+      BIT_SET(young,HORN);
+    }
     switch_timer.reset();
   }
   
   /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
   if(young != old || CAN_TX.check()){
-    Serial.print(CAN_errors,BIN);
+    Serial.print("ERRORS:");
+    Serial.println(CAN_errors,BIN);
+    Serial.println(young,BIN);
     CanControl.Send(SW_Data(young),TXB0);
     CAN_TX.reset();
+    old = young;
   }
 
     // Call CanControl.Send(Layout); to send a packet
     // Call CanControl.Available();  to check whether a packet is received
     // Frame& f = CanControl.Read(); to get a frame from the queue.
-    // DC_Steering packet(f); 		 to convert it to a specific Layout.
-
-//  /* Write to serial for testing */
-//  if (young != old || CAN_TX.check())
-//  {
-//    Serial.println(young,BIN);
-//        old = young;
-  }                
-
+    // DC_Steering packet(f); 		 to convert it to a specific Layout.             
+}
