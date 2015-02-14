@@ -10,9 +10,6 @@
 #include "sc7-can-libinclude.h"
 
 //------------------------------CONSTANTS----------------------------//
-// id
- const uint16_t DC_ID         = 0x00C7; // For SC7
- const uint16_t DC_SER_NO     = 0x0042; // Don't panic!
 
 // pins
 const byte BRAKE_PIN     = 44;
@@ -24,7 +21,6 @@ const byte HORN_PIN      = 0;
 const byte RT_PIN        = 0;
 const byte LT_PIN        = 0;
 const byte HEADLIGHT_PIN = 0;
-const byte ERROR_PIN     = 13;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -39,23 +35,30 @@ const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
 
 // timer intervals (all in ms)
-const uint16_t MC_HB_INTERVAL    = 1000; // motor controller heartbeat
-const uint16_t SW_HB_INTERVAL    = 1000; // steering wheel heartbeat
-const uint16_t BMS_HB_INTERVAL   = 1000; // bms heartbeat
-const uint16_t MC_SEND_INTERVAL  = 1000; // motor controller send packet
-const uint16_t BMS_SEND_INTERVAL = 1000; // bms send packet
-const uint16_t SW_SEND_INTERVAL  = 1000; // steering wheel send packet
-const uint16_t DC_SEND_INTERVAL  = 1000; // driver controls heartbeat
-const uint16_t WDT_INTERVAL      = 1000; // watchdog timer
+const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
+const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
+const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
+const uint16_t DC_DRIVE_INTERVAL = 1000;  // drive command packet
+const uint16_t DC_INFO_INTERVAL  = 1000;  // driver controls info packet
+const uint16_t DC_HB_INTERVAL    = 1000;  // driver controls heartbeat packet
+const uint16_t WDT_INTERVAL      = 1000;  // watchdog timer
 
 // drive parameters
-const uint16_t MAX_ACCEL_VOLTAGE  = 1024; // max possible accel voltage
-const float MAX_ACCEL_RATIO       = 0.8; // maximum safe accel ratio
-const uint16_t MAX_REGEN_VOLTAGE  = 1024; // max possible regen voltage
-const float MAX_REGEN_RATIO       = 1.0; // maximum safe regen ratio
-const float MIN_PEDAL_TOLERANCE   = 0.05; // anything less is basically zero
-const float FORWARD_VELOCITY      = 100.0f; // velocity to use if forward
+const uint16_t MAX_ACCEL_VOLTAGE  = 1024;    // max possible accel voltage
+const float MAX_ACCEL_RATIO       = 0.8;     // maximum safe accel ratio
+const uint16_t MAX_REGEN_VOLTAGE  = 1024;    // max possible regen voltage
+const float MAX_REGEN_RATIO       = 1.0;     // maximum safe regen ratio
+const float MIN_PEDAL_TOLERANCE   = 0.05;    // anything less is basically zero
+const float FORWARD_VELOCITY      = 100.0f;  // velocity to use if forward
 const float REVERSE_VELOCITY      = -100.0f; // velocity to use if reverse
+const uint16_t DC_ID              = 0x00C7;  // For SC7
+const uint16_t DC_SER_NO          = 0x0042;  // Don't panic!
+
+// steering wheel parameters
+const byte GEAR_NEUTRAL = 0x0;
+const byte GEAR_FORWARD = 0x1;
+const byte GEAR_REVERSE = 0x2;
+const byte SW_ON_BIT    = 1;   // value that corresponds to on for steering wheel data
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x0001; // motor controller timed out
@@ -67,7 +70,7 @@ const uint16_t SW_BAD_GEAR = 0x0008; // bad gearing from steering wheel
 /*
  * Enum to represet the possible gear states.
  */
-enum GearState { BRAKE, FORWARD, REVERSE, REGEN };
+enum GearState { BRAKE, FORWARD, REVERSE, REGEN, NEUTRAL };
 
 /*
  * Struct to hold informations about the car state.
@@ -80,7 +83,7 @@ struct CarState {
   uint16_t accelRaw; // raw voltage reading from accel input
   
   // steering wheel info
-  bool gearForward; // true if gear is forward, false if reverse
+  byte gearRaw;     // 00 = neutral, 01 = forward, 10 = reverse, 11 = undefined
   bool hornEngaged; // true if horn is engaged by driver
   
   // motor info
@@ -99,7 +102,7 @@ struct CarState {
                     // constrained for safety
                     
   // gearing
-  GearState gear; // brake, foward, reverse, regen
+  GearState gear; // brake, foward, reverse, regen, neutral
   
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
@@ -114,13 +117,12 @@ CAN_IO canControl(CS_PIN, INTERRUPT_PIN, BAUD_RATE, FREQ);
 CarState state;
 
 // timers
-Metro mcHbTimer(MC_HB_INTERVAL); // motor controller heartbeat
-Metro swHbTimer(SW_HB_INTERVAL); // steering wheel heartbeat
-Metro bmsHbTimer(BMS_HB_INTERVAL); // bms heartbeat
-Metro mcSendTimer(MC_SEND_INTERVAL); // motor controller send packet
-Metro swSendTimer(SW_SEND_INTERVAL); // steering wheel send packet
-Metro bmsSendTimer(BMS_SEND_INTERVAL); // bms send packet
-Metro dcSendTimer(DC_SEND_INTERVAL); // driver controls heartbeat
+Metro mcHbTimer(MC_HB_INTERVAL);       // motor controller heartbeat
+Metro swHbTimer(SW_HB_INTERVAL);       // steering wheel heartbeat
+Metro bmsHbTimer(BMS_HB_INTERVAL);     // bms heartbeat
+Metro dcDriveTimer(DC_DRIVE_INTERVAL); // motor controller send packet
+Metro dcInfoTimer(DC_INFO_INTERVAL);   // steering wheel send packet
+Metro dcHbTimer(DC_HB_INTERVAL);       // driver controls heartbeat
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -170,11 +172,7 @@ void readCAN() {
     }
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
-      
-      // get gear info
-      state.gearForward = (packet.gear & 0x01);
-      
-      // get other info
+      state.gearRaw = packet.gear;
       state.hornEngaged = packet.horn;
     }  
   }
@@ -218,6 +216,7 @@ void updateState() {
                                MAX_REGEN_RATIO);
   
   // update gear state
+  state.dcErrorFlags &= ~SW_BAD_GEAR; // clear bad gear flag
   if (state.brakeEngaged) { // brake engaged, overrides all other gears
     state.gear = BRAKE;
   }
@@ -225,7 +224,21 @@ void updateState() {
     state.gear = REGEN;
   }
   else { // accel or nothing engaged
-    state.gear = (state.gearForward ? FORWARD : REVERSE);
+    switch (state.gearRaw){
+    case GEAR_NEUTRAL:
+      state.gear = NEUTRAL;
+      break;
+    case GEAR_FORWARD:
+      state.gear = FORWARD;
+      break;
+    case GEAR_REVERSE:
+      state.gear = REVERSE;
+      break;
+    default: // unknown gear
+      state.gear = NEUTRAL; // safe default gear?
+      state.dcErrorFlags |= SW_BAD_GEAR; // flag bad gear
+      break;
+    }
   }
 }
 
@@ -233,9 +246,6 @@ void updateState() {
  * Sets general purpose output according to car state.
  */
 void writeOutputs() {
-  // check for errors
-  digitalWrite(ERROR_PIN, (state.canErrorFlags || state.dcErrorFlags) ? HIGH : LOW);
-  
   // write horn
   digitalWrite(HORN_PIN, state.hornEngaged ? HIGH : LOW);
 }
@@ -246,7 +256,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (mcSendTimer.check()) { // ready to send drive command
+  if (dcDriveTimer.check()) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -266,22 +276,26 @@ void writeCAN() {
       MCvelocity = 0;                                                              // Do REGEN while braking
       MCcurrent = MAX_REGEN_RATIO;
       break;
+    case NEUTRAL:                                                                  // coast
+      MCvelocity = 0;
+      MCcurrent = 0;
+      break;
     }
     
     // create and send packet
     canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXB0);
     
     // reset timer
-    mcSendTimer.reset();
+    dcDriveTimer.reset();
   }
   
   // check if driver controls heartbeat needs to be sent
-  if (dcSendTimer.check()) {
+  if (dcHbTimer.check()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB1);
     
     // reset timer
-    dcSendTimer.reset(); 
+    dcHbTimer.reset(); 
   }
 }
 
@@ -289,7 +303,6 @@ void writeCAN() {
 void setup() {
   // setup pin I/O
   pinMode(BRAKE_PIN, INPUT_PULLUP);
-  pinMode(ERROR_PIN, OUTPUT);
   pinMode(HORN_PIN, OUTPUT);
   
   // setup CAN
@@ -300,7 +313,7 @@ void setup() {
   
   // init car state
   state = {}; // init all members to 0
-  state.gear = BRAKE;
+  state.gear = NEUTRAL;
   
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -309,10 +322,9 @@ void setup() {
   mcHbTimer.reset();
   swHbTimer.reset();
   bmsHbTimer.reset();
-  mcSendTimer.reset();
-  swSendTimer.reset();
-  bmsSendTimer.reset();
-  dcSendTimer.reset();
+  dcDriveTimer.reset();
+  dcInfoTimer.reset();
+  dcHbTimer.reset();
   
   // debugging
   Serial.begin(9600);
@@ -370,6 +382,9 @@ void loop() {
     break;
   case REGEN:
     Serial.println("REGEN");
+    break;
+  case NEUTRAL:
+    Serial.println("NEUTRAL");
     break;
   }
   Serial.print("CAN error: ");
