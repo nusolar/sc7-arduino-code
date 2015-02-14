@@ -14,15 +14,16 @@
 const bool DEBUG = false; // change to true to output debug info over serial
 
 // pins
-const byte BRAKE_PIN     = 44;
-const byte ACCEL_PIN     = 4;
-const byte REGEN_PIN     = 3;
-const byte INTERRUPT_PIN = 5;
-const byte CS_PIN        = 4;
-const byte HORN_PIN      = 0;
-const byte RT_PIN        = 0;
-const byte LT_PIN        = 0;
-const byte HEADLIGHT_PIN = 0;
+const byte BRAKE_PIN      = 44;
+const byte ACCEL_PIN      = 4;
+const byte REGEN_PIN      = 3;
+const byte INTERRUPT_PIN  = 5;
+const byte CS_PIN         = 4;
+const byte HORN_PIN       = 0;
+const byte RIGHT_TURN_PIN = 0;
+const byte LEFT_TURN_PIN  = 0;
+const byte HEADLIGHT_PIN  = 0;
+const byte BRAKELIGHT_PIN = 0;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -43,7 +44,8 @@ const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 1000;  // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 1000;  // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 1000;  // driver controls heartbeat packet
-const uint16_t WDT_INTERVAL      = 1000;  // watchdog timer
+const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
+const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE  = 1024;    // max possible accel voltage
@@ -85,8 +87,12 @@ struct CarState {
   uint16_t accelRaw; // raw voltage reading from accel input
   
   // steering wheel info
-  byte gearRaw;     // 00 = neutral, 01 = forward, 10 = reverse, 11 = undefined
-  bool hornEngaged; // true if horn is engaged by driver
+  byte gearRaw;       // 00 = neutral, 01 = forward, 10 = reverse, 11 = undefined
+  bool horn;          // true if driver wants horn on (no toggle)
+  bool headlights;    // true if driver wants headlights on (no toggle)
+  bool rightTurn;     // true if driver wants right turn on (no toggle)
+  bool leftTurn;      // true if driver wants left turn on (no toggle)
+  bool hazards;       // true if driver wants hazards on (no toggle)
   
   // motor info
   float motorVelocity;
@@ -105,6 +111,10 @@ struct CarState {
                     
   // gearing
   GearState gear; // brake, foward, reverse, regen, neutral
+  
+  // top shell
+  bool rightTurnOn;   // true if we should turn rt signal on
+  bool leftTurnOn;    // true if we should turn lt signal on
   
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
@@ -125,6 +135,9 @@ Metro bmsHbTimer(BMS_HB_INTERVAL);     // bms heartbeat
 Metro dcDriveTimer(DC_DRIVE_INTERVAL); // motor controller send packet
 Metro dcInfoTimer(DC_INFO_INTERVAL);   // steering wheel send packet
 Metro dcHbTimer(DC_HB_INTERVAL);       // driver controls heartbeat
+Metro hazardsTimer(TOGGLE_INTERVAL);   // timer for toggling hazards
+Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
+Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -175,7 +188,11 @@ void readCAN() {
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
       state.gearRaw = packet.gear;
-      state.hornEngaged = packet.horn;
+      state.horn = (packet.horn == SW_ON_BIT);
+      state.rightTurn = (packet.rts == SW_ON_BIT);
+      state.leftTurn = (packet.lts == SW_ON_BIT);
+      state.headlights = (packet.headlights == SW_ON_BIT);
+      state.hazards = (packet.hazards == SW_ON_BIT);
     }  
   }
 }
@@ -185,18 +202,23 @@ void readCAN() {
  * If any timer has expired, updates the error state.
  */
 void checkTimers() {
+  // check motor controller
   if (mcHbTimer.check()) { // motor controller timeout
     state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
   else {
     state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
   }
+  
+  // check bms
   if (bmsHbTimer.check()) { // bms timeout
     state.dcErrorFlags |= BMS_TIMEOUT; // set flag
   }
   else {
     state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
   }
+  
+  // check steering wheel
   if (swHbTimer.check()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
   }
@@ -251,14 +273,49 @@ void updateState() {
       break;
     }
   }
+  
+  // update top shell state
+  // check hazards
+  if (state.hazards) { // hazards active
+    if (hazardsTimer.check()) { // timer expired, toggle
+      state.rightTurnOn = !state.rightTurnOn;
+      state.leftTurnOn = state.rightTurnOn; // make sure they have same value
+      hazardsTimer.reset();
+    }
+  }
+  else { // hazards inactive
+    // check right turn signal
+    if (state.rightTurn) { // right turn signal active
+      if (rightTurnTimer.check()) { // timer expired, toggle
+        state.rightTurnOn = !state.rightTurnOn;
+        rightTurnTimer.reset();
+      }
+    }
+    else { // right turn signal inactive
+      state.rightTurnOn = false;
+    }
+    // check left turn signal
+    if (state.leftTurn) { // left turn signal active
+      if (leftTurnTimer.check()) { // timer expired, toggle
+        state.leftTurnOn = !state.leftTurnOn;
+        leftTurnTimer.reset();
+      }
+      else { // left turn signal inactive
+        state.leftTurnOn = false;
+      }
+    }
+  }
 }
 
 /*
  * Sets general purpose output according to car state.
  */
 void writeOutputs() {
-  // write horn
-  digitalWrite(HORN_PIN, state.hornEngaged ? HIGH : LOW);
+  digitalWrite(HORN_PIN, state.horn ? HIGH : LOW);
+  digitalWrite(HEADLIGHT_PIN, state.headlights ? HIGH : LOW);
+  digitalWrite(BRAKELIGHT_PIN, state.brakeEngaged ? HIGH : LOW);
+  digitalWrite(RIGHT_TURN_PIN, state.rightTurnOn ? HIGH : LOW);
+  digitalWrite(LEFT_TURN_PIN, state.leftTurnOn ? HIGH : LOW);  
 }
 
 /*
@@ -315,6 +372,10 @@ void setup() {
   // setup pin I/O
   pinMode(BRAKE_PIN, INPUT_PULLUP);
   pinMode(HORN_PIN, OUTPUT);
+  pinMode(HEADLIGHT_PIN, OUTPUT);
+  pinMode(BRAKELIGHT_PIN, OUTPUT);
+  pinMode(RIGHT_TURN_PIN, OUTPUT);
+  pinMode(LEFT_TURN_PIN, OUTPUT);
   
   // setup CAN
   CANFilterOpt filters;
@@ -401,11 +462,23 @@ void loop() {
       Serial.println("NEUTRAL");
       break;
     }
+    Serial.print("Horn: ");
+    Serial.println(state.horn ? "ON" : "OFF");
+    Serial.print("Headlights: ");
+    Serial.println(state.headlights ? "ON" : "OFF");
+    Serial.print("Brakelights: ");
+    Serial.println(state.brakeEngaged ? "ON" : "OFF");
+    Serial.print("Right turn signal: ");
+    Serial.println(state.rightTurn ? "ON" : "OFF");
+    Serial.print("Left turn signal: ");
+    Serial.println(state.leftTurn ? "ON" : "OFF");
+    Serial.print("Hazards: ");
+    Serial.println(state.hazards ? "ON" : "OFF");
     Serial.print("CAN error: ");
     Serial.println(state.canErrorFlags);
     Serial.print("Board error: ");
     Serial.println(state.dcErrorFlags);
     Serial.println('\n');
-    delay(100);
+    delay(1000);
   }
 }
