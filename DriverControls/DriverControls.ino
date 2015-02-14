@@ -10,7 +10,6 @@
 #include "sc7-can-libinclude.h"
 
 //------------------------------CONSTANTS----------------------------//
-
 // debugging
 const bool DEBUG = false; // change to true to output debug info over serial
 
@@ -189,11 +188,20 @@ void checkTimers() {
   if (mcHbTimer.check()) { // motor controller timeout
     state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
-  if (bmsHbTimer.check()) {
-    state.dcErrorFlags |= BMS_TIMEOUT;
+  else {
+    state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
   }
-  if (swHbTimer.check()) {
-    state.dcErrorFlags |= SW_TIMEOUT;
+  if (bmsHbTimer.check()) { // bms timeout
+    state.dcErrorFlags |= BMS_TIMEOUT; // set flag
+  }
+  else {
+    state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
+  }
+  if (swHbTimer.check()) { // steering wheel timeout
+    state.dcErrorFlags |= SW_TIMEOUT; // set flag
+  }
+  else {
+    state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
   }
 }
 
