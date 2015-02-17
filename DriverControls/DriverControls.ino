@@ -24,6 +24,7 @@ const byte RIGHT_TURN_PIN = 7;
 const byte LEFT_TURN_PIN  = 8;
 const byte HEADLIGHT_PIN  = 9;
 const byte BRAKELIGHT_PIN = 10;
+const byte BOARDLED       = 13;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -394,6 +395,15 @@ void setup() {
   pinMode(BRAKELIGHT_PIN, OUTPUT);
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
+  pinMode(BOARDLED,OUTPUT);
+  
+  digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
+  
+  // debugging [ For some reason the board doesn't work unless I do this here instead of at the bottom ]
+  if (DEBUG) {
+    Serial.begin(9600);
+    Serial.println("Serial Initialized");
+  }
   
   // setup CAN
   CANFilterOpt filters;
@@ -404,7 +414,7 @@ void setup() {
   // init car state
   state = {}; // init all members to 0
   state.gear = NEUTRAL;
-  
+    
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
   
@@ -415,11 +425,8 @@ void setup() {
   dcDriveTimer.reset();
   dcInfoTimer.reset();
   dcHbTimer.reset();
-  
-  // debugging
-  if (DEBUG) {
-    Serial.begin(9600);
-  }
+ 
+  digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
 }
 
 void loop() {  
