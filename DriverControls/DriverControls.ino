@@ -94,6 +94,7 @@ struct CarState {
   bool rightTurn;     // true if driver wants right turn on (no toggle)
   bool leftTurn;      // true if driver wants left turn on (no toggle)
   bool hazards;       // true if driver wants hazards on (no toggle)
+  bool cruiseCtrl;    // true if driver wants cruise control on
   
   // motor info
   float motorVelocity;
@@ -110,10 +111,19 @@ struct CarState {
   float regenRatio; // ratio of regen voltage to max voltage
                     // constrained for safety
                     
+  // motor current
+  float accelCurrent;   // current to use if in drive/reverse
+  float regenCurrent;   // current to use if in regen
+                    
+  // cruise control
+  bool cruiseCtrlOn;     // true if cruise control should be active
+  bool cruiseCtrlPrev;   // prev value of cruiseCtrl
+  float cruiseCtrlRatio; // pedal ratio to use if cruise control active
+                    
   // gearing
   GearState gear; // brake, foward, reverse, regen, neutral
   
-  // top shell
+  // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
   
@@ -192,12 +202,18 @@ void readCAN() {
     }
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
+      
+      // read data
       state.gearRaw = packet.gear;
       state.horn = (packet.horn == SW_ON_BIT);
       state.rightTurn = (packet.rts == SW_ON_BIT);
       state.leftTurn = (packet.lts == SW_ON_BIT);
       state.headlights = (packet.headlights == SW_ON_BIT);
       state.hazards = (packet.hazards == SW_ON_BIT);
+      
+      // read cruise control
+      state.cruiseCtrlPrev = state.cruiseCtrl;
+      state.cruiseCtrl = packet.cruisectrl;
     }  
   }
 }
@@ -310,6 +326,32 @@ void updateState() {
       }
     }
   }
+  
+  // update cruise control state
+  if (!state.cruiseCtrlPrev && state.cruiseCtrl) { // cruise control just switched on
+    state.cruiseCtrlOn = true;
+    state.cruiseCtrlRatio = state.accelRatio;
+  }
+  else if (state.gear == BRAKE || state.gear == REGEN ||
+           !state.cruiseCtrl) { // regen pedal pressed or cruise control switched off
+    state.cruiseCtrlOn = false;
+  }
+  
+  // update current values to be sent to motor controller
+  state.regenCurrent = state.regenRatio < MIN_PEDAL_TOLERANCE ? 
+                       0 : 
+                       state.regenRatio; 
+  
+  if (state.cruiseCtrlOn) { // cruise control on, make sure that current doesn't fall below cruise control ratio
+    state.accelCurrent = state.accelRatio < state.cruiseCtrlRatio ? 
+                         state.cruiseCtrlRatio : 
+                         state.accelRatio;
+  }
+  else { // no cruise control, take pedal value (or 0 if below tolerance)
+    state.accelCurrent = state.accelRatio < MIN_PEDAL_TOLERANCE ? 
+                         0 : 
+                         state.accelRatio;
+  }
 }
 
 /*
@@ -334,22 +376,22 @@ void writeCAN() {
     float MCvelocity, MCcurrent;
     switch (state.gear) {
     case FORWARD:
-      MCvelocity = FORWARD_VELOCITY;                                               // Target Vel = 100 mph
-      MCcurrent = (state.accelRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.accelRatio; // Set current to acceleration value unless below tolerance
+      MCvelocity = FORWARD_VELOCITY;
+      MCcurrent = state.accelCurrent;
       break;
     case REVERSE:
-      MCvelocity = REVERSE_VELOCITY;                                               // Target Vel = -100 mph
-      MCcurrent = (state.accelRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.accelRatio; // Set current to acceleration value unless below tolerance
+      MCvelocity = REVERSE_VELOCITY;
+      MCcurrent = state.accelCurrent;
       break;
-    case REGEN:
-      MCvelocity = 0;                                                              // Target Vel = 0 mph for regen
-      MCcurrent = (state.regenRatio < MIN_PEDAL_TOLERANCE) ? 0 : state.regenRatio; // Set current to acceleration value unless below tolerance
+    case REGEN: // drive current back through batteries to recharge them
+      MCvelocity = 0;
+      MCcurrent = state.regenCurrent; 
       break;
-    case BRAKE:
-      MCvelocity = 0;                                                              // Do REGEN while braking
+    case BRAKE: // do regen while braking
+      MCvelocity = 0;
       MCcurrent = MAX_REGEN_RATIO;
       break;
-    case NEUTRAL:                                                                  // coast
+    case NEUTRAL: // coast
       MCvelocity = 0;
       MCcurrent = 0;
       break;
@@ -361,8 +403,7 @@ void writeCAN() {
     // reset timer
     dcDriveTimer.reset();
   }
-  
-  delay(10);
+  delay(10); // mcp2515 seems to require small delay
   
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
@@ -372,7 +413,6 @@ void writeCAN() {
     // reset timer
     dcHbTimer.reset(); 
   }
-  
   delay(10);
   
   // check if driver controls info packet needs to be sent
@@ -469,12 +509,16 @@ void loop() {
     Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
     Serial.print("Accel pedal raw: ");
     Serial.println(state.accelRaw);
-    Serial.print("Regen pedal raw: ");
-    Serial.println(state.regenRaw);
     Serial.print("Accel ratio: ");
     Serial.println(state.accelRatio);
+    Serial.print("Accel current: ");
+    Serial.println(state.accelCurrent);
+    Serial.print("Regen pedal raw: ");
+    Serial.println(state.regenRaw);
     Serial.print("Regen ratio: ");
     Serial.println(state.regenRatio);
+    Serial.print("Regen current: ");
+    Serial.println(state.regenCurrent);
     Serial.print("Gear: ");
     switch (state.gear) {
     case BRAKE:
@@ -501,10 +545,20 @@ void loop() {
     Serial.println(state.brakeEngaged ? "ON" : "OFF");
     Serial.print("Right turn signal: ");
     Serial.println(state.rightTurn ? "ON" : "OFF");
+    Serial.print("Right turn singal active: ");
+    Serial.println(state.rightTurnOn ? "YES" : "NO");
     Serial.print("Left turn signal: ");
     Serial.println(state.leftTurn ? "ON" : "OFF");
+    Serial.print("Left turn signal active: ");
+    Serial.println(state.leftTurnOn ? "YES" : "NO");
     Serial.print("Hazards: ");
     Serial.println(state.hazards ? "ON" : "OFF");
+    Serial.print("Cruise control: ");
+    Serial.println(state.cruiseCtrl ? "ON" : "OFF");
+    Serial.print("Cruise control active: ");
+    Serial.println(state.cruiseCtrlOn ? "YES" : "NO");
+    Serial.print("Cruise control ratio: ");
+    Serial.println(state.cruiseCtrlRatio);
     Serial.print("CAN error: ");
     Serial.println(state.canErrorFlags);
     Serial.print("Board error: ");
