@@ -173,21 +173,25 @@ void loop() {
   if (can.Available()){
     Frame&f = can.Read();
     if (f.id == MC_BUS_STATUS_ID){
-      MC_BusStatus received(f);
-      float current = received.bus_current;
+      MC_BusStatus receivedMC(f);
+      float current = receivedMC.bus_current;
       screen.selectLine(1);
       screen.print("MC Bus Current: ");
       screen.selectLine(2);
       screen.print(current);
       CAN_RX.reset();
     }
-    else if (f.id == 
-    
-    DC_Steering received(f);
-    
-    
-    // Call CanControl.Send(Layout); to send a packet
-    // Call CanControl.Available();  to check whether a packet is received
-    // Frame& f = CanControl.Read(); to get a frame from the queue.
-    // DC_Steering packet(f); 		 to convert it to a specific Layout.             
+    else if (f.id == DC_STEERING_ID){
+      DC_Steering receivedDC(f);
+      byte velocity = receivedDC.velocity;
+      screen.selectLine(1);
+      screen.print("Velocity: ");
+      screen.selectLine(2);
+      screen.print(velocity);
+      CAN_RX.reset();
+    }
+  }
+  else if (CAN_RX.check()){
+    screen.print("Communic. lost with DrivCont");
+  }         
 }
