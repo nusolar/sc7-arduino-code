@@ -63,7 +63,7 @@ const uint16_t DC_SER_NO          = 0x0042;  // Don't panic!
 const byte GEAR_NEUTRAL = 0x0;
 const byte GEAR_FORWARD = 0x1;
 const byte GEAR_REVERSE = 0x2;
-const byte SW_ON_BIT    = 1;   // value that corresponds to on for steering wheel data
+const byte SW_ON_BIT    = 0;   // value that corresponds to on for steering wheel data
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -560,9 +560,9 @@ void loop() {
     Serial.print("Cruise control ratio: ");
     Serial.println(state.cruiseCtrlRatio);
     Serial.print("CAN error: ");
-    Serial.println(state.canErrorFlags);
+    Serial.println(state.canErrorFlags, HEX);
     Serial.print("Board error: ");
-    Serial.println(state.dcErrorFlags);
+    Serial.println(state.dcErrorFlags, HEX);
     Serial.print("System time: ");
     Serial.println(millis());
     Serial.println();
@@ -571,4 +571,6 @@ void loop() {
     
     delay(1000);
   }
+  
+  state.canErrorFlags = 0;
 }
