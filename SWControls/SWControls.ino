@@ -88,74 +88,45 @@ SPDT - forward/neutral/reverse, headlight/no light/hazard*/
   CANFilterOpt filter;
   filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
   filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
-  CanControl.Setup(filter, &CAN_errors);
+  CanControl.Setup(filter, &CAN_errors, RX0IE|RX1IE|ERRIE);
   
   screen.begin();
   screen.clear();
   screen.setBrightness(25);
 }
 
-inline void setyoungbit(byte pin, byte& out, byte mask){
-  if (digitalRead(pin)==1){
+inline void switchBitFromPin(byte pin, byte& out, byte mask){
+  switchBit(digitalRead(pin),out, mask);
+}
+
+inline void switchBit(bool b, byte& out, byte mask) {
+  if (b){
     BIT_SET(out,mask);
-  }
-  else{
+  }else{
     BIT_CLEAR(out,mask);
   }
 }
-
-inline void setyoungbitspecial(byte pin1, byte pin2, byte& out, byte mask1, byte mask2){
-  if ((digitalRead(pin1) == 1)&&(digitalRead(pin2) == 1)){
-    BIT_CLEAR(out,mask1);
-    BIT_CLEAR(out,mask2);
-  }
-  else if ((digitalRead(pin1) == 0)&&(digitalRead(pin2) == 1)){
-    BIT_SET(out,mask2);
-    BIT_CLEAR(out,mask1);
-  }
-  else if ((digitalRead(pin1) == 1)&&(digitalRead(pin2) == 0)){
-    BIT_SET(out,mask1);
-    BIT_CLEAR(out,mask2);
-  }
-}
-
-//inline void setyoungbitbutton(byte pin, byte& out, byte mask){
-//  button.poll();
-//  
-//}
 
 void loop() {  
 /*if the metro timer runs out, then check the states of all the switches
     assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check() == 1){
     old = young; // Store old switch values.
-    setyoungbit(fgp,  young,FWD_GEAR);
-    setyoungbit(rgp,  young,REV_GEAR);
-    setyoungbit(hp,   young,HEADLIGHT);
-    setyoungbit(hzp,  young,HAZARDLIGHT);
-    //setyoungbitspecial(fgp,rgp,young,FWD_GEAR,REV_GEAR);
-    //setyoungbitspecial(hp,hzp,young,HEADLIGHT,HAZARDLIGHT);
-    setyoungbit(ltp,  young,LEFT_TURN);
-    setyoungbit(rtp,  young,RIGHT_TURN);
+    switchBitFromPin(fgp,  young,FWD_GEAR);
+    switchBitFromPin(rgp,  young,REV_GEAR);
+    switchBitFromPin(hp,   young,HEADLIGHT);
+    switchBitFromPin(hzp,  young,HAZARDLIGHT);
+    switchBitFromPin(ltp,  young,LEFT_TURN);
+    switchBitFromPin(rtp,  young,RIGHT_TURN);
+	
     cruisecontrol.poll();
     if(cruisecontrol.pushed()){
-      if(cruisecontroltoggle == true){
-        cruisecontroltoggle = false;
-        BIT_SET(young,CRUISE_CONTROL);
-      }
-      else{
-        cruisecontroltoggle = true;
-        BIT_CLEAR(young,CRUISE_CONTROL);
-      }
+      cruisecontroltoggle = !cruisecontroltoggle;
+      switchBit(cruisecontroltoggle, young, CRUISE_CONTROL);
     }
     
     horn.poll();
-    if(horn.on()){
-      BIT_CLEAR(young,HORN);
-    }
-    else {
-      BIT_SET(young,HORN);
-    }
+	switchBit(horn.on(), young, HORN);
     switch_timer.reset();
   }
   
@@ -170,24 +141,22 @@ void loop() {
     old = young;
   }
 
-  if (can.Available()){
-    Frame&f = can.Read();
+  if (CanControl.Available()){
+    Frame& f = CanControl.Read();
     if (f.id == MC_BUS_STATUS_ID){
       MC_BusStatus receivedMC(f);
-      float current = receivedMC.bus_current;
       screen.selectLine(1);
       screen.print("MC Bus Current: ");
       screen.selectLine(2);
-      screen.print(current);
+      screen.print(receivedMC.bus_current);
       CAN_RX.reset();
     }
-    else if (f.id == DC_STEERING_ID){
-      DC_Steering receivedDC(f);
-      byte velocity = receivedDC.velocity;
+    else if (f.id == MC_VELOCITY_ID){
+      MC_Velocity receivedVel(f);
       screen.selectLine(1);
       screen.print("Velocity: ");
       screen.selectLine(2);
-      screen.print(velocity);
+      screen.print(receivedVel.car_velocity);
       CAN_RX.reset();
     }
   }
