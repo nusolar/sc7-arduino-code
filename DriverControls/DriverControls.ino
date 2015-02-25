@@ -60,9 +60,9 @@ const uint16_t DC_ID              = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO          = 0x0042;  // Don't panic!
 
 // steering wheel parameters
-const byte GEAR_NEUTRAL = 0x0;
-const byte GEAR_FORWARD = 0x1;
-const byte GEAR_REVERSE = 0x2;
+const byte GEAR_NEUTRAL = 0x3;
+const byte GEAR_FORWARD = 0x2;
+const byte GEAR_REVERSE = 0x1;
 const byte SW_ON_BIT    = 0;   // value that corresponds to on for steering wheel data
 
 // driver control errors
@@ -213,7 +213,7 @@ void readCAN() {
       
       // read cruise control
       state.cruiseCtrlPrev = state.cruiseCtrl;
-      state.cruiseCtrl = packet.cruisectrl;
+      state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
     }  
   }
 }
@@ -454,6 +454,7 @@ void setup() {
   // init car state
   state = {}; // init all members to 0
   state.gear = NEUTRAL;
+  state.gearRaw = GEAR_NEUTRAL;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
