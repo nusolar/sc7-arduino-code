@@ -321,9 +321,9 @@ void updateState() {
         state.leftTurnOn = !state.leftTurnOn;
         leftTurnTimer.reset();
       }
-      else { // left turn signal inactive
-        state.leftTurnOn = false;
-      }
+    }
+    else { // left turn signal inactive
+      state.leftTurnOn = false;
     }
   }
   
