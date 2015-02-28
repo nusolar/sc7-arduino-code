@@ -11,7 +11,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = true; // change to true to output debug info over serial
+const bool DEBUG = false; // change to true to output debug info over serial
 
 // pins
 const byte BRAKE_PIN      = 44;
@@ -42,11 +42,12 @@ const uint16_t RXF5      = MASK_NONE;
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
 const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
-const uint16_t DC_DRIVE_INTERVAL = 1000;  // drive command packet
-const uint16_t DC_INFO_INTERVAL  = 1000;  // driver controls info packet
-const uint16_t DC_HB_INTERVAL    = 1000;  // driver controls heartbeat packet
+const uint16_t DC_DRIVE_INTERVAL = 50;  // drive command packet
+const uint16_t DC_INFO_INTERVAL  = 200;  // driver controls info packet
+const uint16_t DC_HB_INTERVAL    = 200;  // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
+const uint16_t DEBUG_INTERVAL    = 1000; 
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE  = 1024;    // max possible accel voltage
@@ -149,6 +150,7 @@ Metro dcHbTimer(DC_HB_INTERVAL);       // driver controls heartbeat
 Metro hazardsTimer(TOGGLE_INTERVAL);   // timer for toggling hazards
 Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
+Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 
 // debugging
 int debugStartTime = 0;
@@ -453,8 +455,8 @@ void setup() {
 
   // init car state
   state = {}; // init all members to 0
-  state.gear = NEUTRAL;
-  state.gearRaw = GEAR_NEUTRAL;
+  state.gear = FORWARD;
+  state.gearRaw = GEAR_FORWARD;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -466,6 +468,7 @@ void setup() {
   dcDriveTimer.reset();
   dcInfoTimer.reset();
   dcHbTimer.reset();
+  debugTimer.reset();
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
 }
@@ -499,7 +502,7 @@ void loop() {
   writeCAN();
   
   // debugging
-  if (DEBUG) {
+  if (DEBUG && debugTimer.check()) {
     debugStartTime = millis();
 
     Serial.print("Loop time: ");
@@ -570,7 +573,8 @@ void loop() {
     
     debugEndTime = millis();
     
-    delay(1000);
+    debugTimer.reset();
+    //delay(1000);
   }
   
   state.canErrorFlags = 0;
