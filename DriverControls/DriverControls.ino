@@ -42,12 +42,12 @@ const uint16_t RXF5      = MASK_NONE;
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
 const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
-const uint16_t DC_DRIVE_INTERVAL = 50;  // drive command packet
-const uint16_t DC_INFO_INTERVAL  = 200;  // driver controls info packet
-const uint16_t DC_HB_INTERVAL    = 200;  // driver controls heartbeat packet
+const uint16_t DC_DRIVE_INTERVAL = 50;    // drive command packet
+const uint16_t DC_INFO_INTERVAL  = 200;   // driver controls info packet
+const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
-const uint16_t DEBUG_INTERVAL    = 1000; 
+const uint16_t DEBUG_INTERVAL    = 1000;  // interval for debug output
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE  = 1024;    // max possible accel voltage
@@ -104,6 +104,9 @@ struct CarState {
   
   // bms info
   float bmsPercentSOC; // percent state of charge of bms
+  
+  // debugging
+  bool wasReset;       // true on initilization, false otherwise
   
   // DERIVED DATA
   // pedals
@@ -404,8 +407,9 @@ void writeCAN() {
     
     // reset timer
     dcDriveTimer.reset();
+    
+    delay(10); // mcp2515 seems to require small delay
   }
-  delay(10); // mcp2515 seems to require small delay
   
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
@@ -414,17 +418,21 @@ void writeCAN() {
     
     // reset timer
     dcHbTimer.reset(); 
+    
+    delay(10);
   }
-  delay(10);
   
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.check()) {
     // create and send packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
-                            state.canErrorFlags, state.dcErrorFlags), TXB2);
+                            state.canErrorFlags, state.dcErrorFlags, state.wasReset), TXB2);
     
     // reset timer
     dcInfoTimer.reset();
+    
+    state.wasReset = false; // clear reset    
+    delay(10); // mcp2515 seems to require small delay
   }
 }
 
@@ -455,8 +463,9 @@ void setup() {
 
   // init car state
   state = {}; // init all members to 0
-  state.gear = FORWARD;
-  state.gearRaw = GEAR_FORWARD;
+  state.gear = NEUTRAL;
+  state.gearRaw = GEAR_NEUTRAL;
+  state.wasReset = true;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -471,6 +480,11 @@ void setup() {
   debugTimer.reset();
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
+  
+  if (DEBUG) {
+    Serial.print("Init CAN error: ");
+    Serial.println(state.canErrorFlags, HEX);
+  }
 }
 
 void loop() {  
@@ -500,6 +514,9 @@ void loop() {
   
   // write CAN
   writeCAN();
+  
+  // clear watchdog timer
+  WDT_Restart(WDT);
   
   // debugging
   if (DEBUG && debugTimer.check()) {
@@ -574,7 +591,6 @@ void loop() {
     debugEndTime = millis();
     
     debugTimer.reset();
-    //delay(1000);
   }
   
   state.canErrorFlags = 0;
