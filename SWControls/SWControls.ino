@@ -51,7 +51,7 @@ const int LEFT = 1;
   //3rd: CAN Reception timer
   Metro CAN_RX = Metro(1000);
   //4th: Cruiser Control display timer
-  Metro CC_timer = Metro(2000);
+  Metro display_timer = Metro(2000);
 
 
 // CAN parameters
@@ -87,6 +87,7 @@ struct LCD{
   int Veldisplay;
   boolean LTdisplay;
   boolean RTdisplay;
+  char notification[16];
 };
 LCD steering_wheel;   
 
@@ -111,7 +112,7 @@ SPDT - forward/neutral/reverse, headlight/no light/hazard*/
   CANFilterOpt filter;
   filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
   filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
-  CanControl.Setup(filter, &CAN_errors, RX0IE|RX1IE|ERRIE);
+  CanControl.Setup(filter, &CAN_errors);
   
   screen.begin();
   screen.clear();
@@ -132,6 +133,73 @@ inline void switchBit(bool b, byte& out, byte mask) {
 
 /*copy over the blink function from the LCD testing code, used to blink the sides of the display for the turning signals*/
 
+inline void blnk(int a){
+ screen.setCursor(1,a);
+ if (a == LEFT){
+   screen.print("<<");
+ }
+ else{
+   screen.print(">>");
+ }
+ screen.setCursor(2,a);
+ if (a == LEFT){
+   screen.print("<<");
+ }
+ else{
+   screen.print(">>");
+ }
+ delay(500);
+ screen.setCursor(1,a);
+ screen.print("  ");
+ screen.setCursor(2,a);
+ screen.print("  ");
+ delay(500);
+}
+
+inline void defaultdisplay(){
+  screen.setCursor(1,4);
+  screen.print("SOC  %");
+  screen.setCursor(1,SOC);
+  screen.print(steering_wheel.SOCdisplay);
+  screen.setCursor(1,LIGHT);
+  screen.print(steering_wheel.Lightsdisplay);
+  screen.setCursor(2,4);
+  screen.print("V:");
+  screen.setCursor(2,V);
+  screen.print(steering_wheel.Veldisplay);
+  screen.setCursor(2,CC);
+  screen.print(steering_wheel.CCdisplay);
+  screen.setCursor(2,GEAR);
+  screen.print(steering_wheel.geardisplay);
+  if(steering_wheel.LTdisplay){
+    blnk(LEFT);
+  }
+  else if(steering_wheel.RTdisplay){
+    blnk(RIGHT);
+  }
+  else{
+    screen.setCursor(1,LEFT);
+    screen.print("  ");
+    screen.setCursor(2,LEFT);
+    screen.print("  ");
+    screen.setCursor(1,RIGHT);
+    screen.print("  ");
+    screen.setCursor(2,RIGHT);
+    screen.print("  ");
+  }
+}
+
+inline void notification(char string[]){
+  display_timer.reset();
+  while(display_timer.check() == 0){
+    screen.selectLine(1);
+    screen.print(string);
+    delay(500);
+    screen.clearLine(1);
+    delay(500);
+  }
+  defaultdisplay();
+}
 
 void loop() {  
 /*if the metro timer runs out, then check the states of all the switches
@@ -140,69 +208,171 @@ void loop() {
     old = young; // Store old switch values.
     switchBitFromPin(fgp,  young,FWD_GEAR);
     switchBitFromPin(rgp,  young,REV_GEAR);
-	/*Check the forward/reverse bit flags and assign appropriate value for the member in display structure
-    if forward bit flag and reverse bit flag are both 1, then the gear character in the display structure is 'N'
-    
-    else if forward bit flag is 1 and reverse bit flag is 0, then the gear character in the display structure is 'F'
-    
-    else if reverse bit flag is 1 and the forward bit flag is 0, then the gear character in the display structure is 'R'
-    */
-    if (FWD_GEAR == 0 && REV_GEAR == 0){
-      steering_wheel.geardisplay = 'N';
-    }
-    else if (FWD_GEAR == 1 && REV_GEAR == 0){
-      steering_wheel.geardisplay = 'F';
-    }
-    else if (REV_GEAR == 1 && FWD_GEAR == 0){
-      steering_wheel.geardisplay = 'R';
-    }
-    
-    /*Check the headlight/hazardlight bit flags and assign appropriate value for the member in display structure
-    if headlight bit flag and hazardlight bit flag are both 1, then the light string in the display structure is blank
-    
-    else if headlight bit flag is 1 and hazardlight bit flag is 0, then the light string in the display structure is 'H'
-    
-    else if hazardlight bit flag is 1 and headlight bit flag is 0, then the light string in the display structure is 'HZ'
-    */
-	
-	switchBitFromPin(hp,   young,HEADLIGHT);
+    switchBitFromPin(hp,   young,HEADLIGHT);
     switchBitFromPin(hzp,  young,HAZARDLIGHT);
-    /*if the left turn bit flag is 1, use blink function mentioned above to blink arrows for the turning signals
-    
-      else if the left turn bit flag is 0, turn off using the LCD library member functions to clear, may need to create additional function to clear just the turn signal area
-    */
-	
     switchBitFromPin(ltp,  young,LEFT_TURN);
     switchBitFromPin(rtp,  young,RIGHT_TURN);
-    //same as with the left turn signal.
-	
+    	
     cruisecontrol.poll();
     if(cruisecontrol.pushed()){
       BIT_FLIP(young,CRUISE_CONTROL);
-    }
-    /*assign appropriate value to the cruise control character in the display structure
-    
-    if cruise control bit flag is 1, then the cruise control character in the display structure is 'C'
-    
-    else the cruise control character in the display structure is blank*/
-    
+    }    
     horn.poll();
 	switchBit(horn.on(), young, HORN);
     switch_timer.reset();
   }
   
+  //Display shenanigans
+  
+  if(FWD_GEAR == 0 && REV_GEAR == 0){
+    if(steering_wheel.geardisplay != 'N'){
+      steering_wheel.geardisplay = 'N';
+      notification("NEUTRAL GEAR");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(FWD_GEAR == 1){
+    if(steering_wheel.geardisplay != 'F'){
+      steering_wheel.geardisplay = 'F';
+      notification("FORWARD GEAR");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay;
+    }
+  }
+  else if(REV_GEAR == 1){
+    if(steering_wheel.geardisplay != 'R'){
+      steering_wheel.geardisplay = 'R';
+      notification("REVERSE GEAR");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  
+  if(HEADLIGHT == 1){
+    if(steering_wheel.Lightsdisplay[1] != ' '){
+      steering_wheel.Lightsdisplay[0] = 'H';
+      steering_wheel.Lightsdisplay[1] = ' ';
+      notification("HEADLIGHTS ON");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(HAZARDLIGHT == 1){
+    if(steering_wheel.Lightsdisplay[1] != 'Z'){
+      steering_wheel.Lightsdisplay[0] = 'H';
+      steering_wheel.Lightsdisplay[1] = 'Z';
+      notification("HAZARDLIGHTS ON");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(HAZARDLIGHT == 1 && HEADLIGHT == 1){
+     if(steering_wheel.Lightsdisplay[0] != ' '){
+       steering_wheel.Lightsdisplay[0] = ' ';
+       steering_wheel.Lightsdisplay[1] = ' ';
+       notification("ALL LIGHTS OFF");
+       defaultdisplay();
+     }
+     else{
+       defaultdisplay();
+     }
+  }
+     
+  
+  
+  if(CRUISE_CONTROL == 1){
+    if(steering_wheel.CCdisplay != 'C'){
+      steering_wheel.CCdisplay = 'C';
+      notification("CRUISECONTROL ON");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(CRUISE_CONTROL == 0){
+    if(steering_wheel.CCdisplay != ' '){
+      steering_wheel.CCdisplay = ' ';
+      notification("CRUISECONTROLOFF");
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  
+  if(LEFT_TURN == 1){
+    if(steering_wheel.LTdisplay != true){
+      steering_wheel.LTdisplay = true;
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(LEFT_TURN == 0){
+    if(steering_wheel.LTdisplay != false){
+      steering_wheel.LTdisplay == false;
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  
+  if(RIGHT_TURN == 1){
+    if(steering_wheel.RTdisplay != true){
+      steering_wheel.RTdisplay = true;
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  }
+  else if(RIGHT_TURN == 0){
+    if(steering_wheel.RTdisplay != false){
+      steering_wheel.RTdisplay = false;
+      defaultdisplay();
+    }
+    else{
+      defaultdisplay();
+    }
+  } 
+  delay(3000);
+  
+  Serial.println(steering_wheel.RTdisplay);
+  Serial.println(steering_wheel.LTdisplay);
+  Serial.println(steering_wheel.CCdisplay);
+  Serial.println(steering_wheel.Lightsdisplay);
+  Serial.println(steering_wheel.SOCdisplay);
+  Serial.println(steering_wheel.geardisplay);
+  Serial.println(steering_wheel.Veldisplay);
+  
+  delay(3000);
+  
   /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
-  if(young != old || CAN_TX.check()){
+  //if(young != old || CAN_TX.check()){
     //Serial.print("ERRORS:");
     //Serial.println(CAN_errors,BIN);
     //Serial.println(young,BIN);
-    CanControl.Send(SW_Data(young),TXB0);
-    CAN_TX.reset();
-    old = young;
-  }
+    //CanControl.Send(SW_Data(young),TXB0);
+    //CAN_TX.reset();
+    //old = young;
+ // }
 
-  if (CanControl.Available()){
+ // if (CanControl.Available()){
    /*Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures
     Frame& f = CanControl.Read();
     if (f.id == MC_BUS_STATUS_ID){
@@ -221,8 +391,8 @@ void loop() {
       screen.print(receivedVel.car_velocity);
       CAN_RX.reset();
     }*/
-  }
-  else if (CAN_RX.check()){
-    screen.print("Communic. lost  with DrivCont");
-  }         
+  //}
+  //else if (CAN_RX.check()){
+  //  screen.print("Communic. lost  with DrivCont");
+  //}         
 }
