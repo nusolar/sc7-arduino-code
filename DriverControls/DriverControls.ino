@@ -183,12 +183,15 @@ void readCAN() {
     // first three digits will be exactly equal to heartbeat ids
     if ((f.id & MASK_Sx00) == BMS_HEARTBEAT_ID) { // source is bms
       bmsHbTimer.reset();
+      state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
     else if ((f.id & MASK_Sx00) == MC_HEARTBEAT_ID) { // source is mc
       mcHbTimer.reset();
+      state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
     }
     else if ((f.id & MASK_Sx00) == SW_HEARTBEAT_ID) { // source is sw
       swHbTimer.reset();
+      state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
     }
     
     // check for specific packets
@@ -232,24 +235,15 @@ void checkTimers() {
   if (mcHbTimer.check()) { // motor controller timeout
     state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
-  else {
-    state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
-  }
   
   // check bms
   if (bmsHbTimer.check()) { // bms timeout
     state.dcErrorFlags |= BMS_TIMEOUT; // set flag
   }
-  else {
-    state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
-  }
   
   // check steering wheel
   if (swHbTimer.check()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
-  }
-  else {
-    state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
   }
 }
 
