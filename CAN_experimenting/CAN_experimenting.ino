@@ -1,12 +1,13 @@
 /* TODO Documentation for this file */
 #define COMPILE_ARDUINO
 //#define DEBUG
+#define LOOPBACK
 
 #include <SPI.h>
 #include "CAN_experimenting.h"
 
-#define CANINT 5
-#define CANCS 4
+#define CANINT 8
+#define CANCS 5
 #define CAN_NBT 1000  //Nominal Bit Time
 #define CAN_FOSC 16
 
@@ -24,6 +25,7 @@ void setup()
 	
     //Start Serial and wait for MCP2515 to finish 128 clock cycles
     Serial.begin(9600);
+    Serial.print("BEGIN");
     delay(100); 
 	
     //create a filter options structure
@@ -31,6 +33,11 @@ void setup()
     filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
     filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
     can.Setup(filter, &errors);
+    
+#ifdef LOOPBACK
+      can.controller.Mode(MODE_LOOPBACK);
+#endif
+    
 #ifdef DEBUG
 	Serial.println(errors, BIN);
 #endif
@@ -38,37 +45,37 @@ void setup()
 
 void loop()
 {
-  //Read switch position from serial
-    if (Serial.available())
-    {
-       switchpos = (Serial.read() == '1') ? 0x0040 : 0x0020 ;
-    }
+  //Generate Random Can Packets and Send them
+  int choice = random(0,10);
+  Serial.print(choice);
+  switch(choice)
+  {
+    case 0:{
+      can.Send(DC_Heartbeat(100.0,42.0),TXB0);
+    break;}
+    case 1:{
+      can.Send(DC_Drive(100.0,random(80)/100.0),TXB0);
+    break;}
+    case 2:{
+      can.Send(BMS_Heartbeat(400.0,99.0),TXB0);
+    break;}
+    case 3:
+    default:{ //Move down later
+      float cvel = random(30);
+      float mvel = cvel + random(-3,3);
+      can.Send(MC_Velocity(cvel,mvel),TXB0);
+    break;}
+  }
+  delay(200);
     
-    if (digitalRead(12)== LOW) // if the transmit button is pressed
-    {
-		read_ins();
-		can.Send(DC_Drive(100.0,Status.current),TXB0);
-                Frame f;
-                f.value = 0;
-                f.s0 = switchpos;
-                f.id = DC_SWITCHPOS_ID;
-	        f.dlc = 8; // send 8 bytes
-	        f.ide = 0; // make it a standard frame
-	        f.rtr = 0; // make it a data frame
-	        f.srr = 0;
-                
-                can.Send(f,TXB1);
-		delay(100);
 #ifdef DEBUG
-		Serial.print("TEC: ");
-		Serial.println(can.controller.Read(TEC), BIN);
-		Serial.print("REC: ");
-		Serial.println(can.controller.Read(REC), BIN);
-		Serial.print("EFLG: ");
-		Serial.println(can.controller.Read(EFLG), BIN);
+	Serial.print("TEC: ");
+	Serial.println(can.controller.Read(TEC), BIN);
+	Serial.print("REC: ");
+	Serial.println(can.controller.Read(REC), BIN);
+	Serial.print("EFLG: ");
+	Serial.println(can.controller.Read(EFLG), BIN);
 #endif
-    }
-	
 	while (can.Available())
 	{
 		Frame& f = can.Read();
@@ -82,13 +89,19 @@ void loop()
 			Serial.println(str); 
 			break;
 		  }
-		  case DC_SWITCHPOS_ID:
+		  case MC_VELOCITY_ID:
 		  {
-			DC_SwitchPos packet(f);
-			sprintf(str, "Id: %x, Pack: %d", packet.id, packet.is_run);
+			MC_Velocity packet(f);
+			sprintf(str, "Id: %x, CarVel: %f, MotVel: %f", packet.id, packet.car_velocity, packet.motor_velocity);
 			Serial.println(str);
 			break;
 		  }
+                  default:
+                  {
+                        Serial.print("Id: ");
+                        Serial.println(f.id,HEX);
+                        break;
+                  }
 	         }
 		
 		//Print out buffer size so we can see if there is overflow (this is not accurate when serial is enabled.
