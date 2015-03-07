@@ -114,7 +114,7 @@ SPDT - forward/neutral/reverse, headlight/no light/hazard*/
   //set Serial and screen baud rate to 9600bps
 	Serial.begin(9600);
 	screen.begin();
-		while (digitalRead(hzp) == LOW) ; //Do nothing if hazards is on, allowing programming to happen.
+        checkProgrammingMode();
 
 	//CAN setup
     CANFilterOpt filter;
@@ -128,13 +128,13 @@ SPDT - forward/neutral/reverse, headlight/no light/hazard*/
      // Enable WDT
      /*pinMode(17, OUTPUT);  // Set RX LED as an output 
      digitalWrite(17,HIGH); delay(500);
-     digitalWrite(17,LOW);    
-     wdt_enable(WDTO_4S);*/
+     digitalWrite(17,LOW);    */
+     wdt_enable(WDTO_4S);
 
 //Initialize turnsignal_on state
 steering_wheel.turnsignal_on = false;
 
-Serial.print("It works up to here");
+//Serial.print("It works up to here");
 }
 
 inline void switchBitFromPin(byte pin, char& out, byte mask){
@@ -211,6 +211,7 @@ inline void displayNotification(){
   
 
 void loop() {  
+  wdt_reset();
   old = young;
   
   /*if the metro timer runs out, then check the states of all the switches
@@ -234,6 +235,8 @@ void loop() {
   
   if (old != young || display_timer.check()){
     //Serial.println(byte(~young),BIN);
+    Serial.print("Display:");
+    Serial.println(display_timer.previous_millis);
     
     //Switch turnsignal_on on and off at regular intervals
     steering_wheel.turnsignal_on = !steering_wheel.turnsignal_on;
@@ -304,9 +307,6 @@ void loop() {
     }
   }
   
-  
-  
-      
   /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
   if(young != old || CAN_TX.check()){
@@ -315,6 +315,8 @@ void loop() {
     Serial.println(young,BIN);
     CAN_TX.reset();
  }
+ 
+ wdt_reset();
 
   if (CanControl.Available()){
    /*Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures*/
@@ -333,4 +335,12 @@ void loop() {
   // else if (CAN_RX.check()){
    // screen.print("Communic. lost  with DrivCont");
   // }         
+}
+
+void checkProgrammingMode()
+{
+   if (digitalRead(hzp) == LOW)
+     screen.print("Turn off Hazards to Exit PrgMd");
+     
+   while (digitalRead(hzp) == LOW) ; //Do nothing if hazards is on, allowing programming to happen.
 }
