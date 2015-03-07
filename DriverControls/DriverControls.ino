@@ -11,7 +11,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = false; // change to true to output debug info over serial
+const bool DEBUG = true; // change to true to output debug info over serial
 
 // pins
 const byte BRAKE_PIN      = 44;
@@ -50,20 +50,20 @@ const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn
 const uint16_t DEBUG_INTERVAL    = 1000;  // interval for debug output
 
 // drive parameters
-const uint16_t MAX_ACCEL_VOLTAGE  = 1024;    // max possible accel voltage
-const float MAX_ACCEL_RATIO       = 0.8;     // maximum safe accel ratio
-const uint16_t MAX_REGEN_VOLTAGE  = 1024;    // max possible regen voltage
-const float MAX_REGEN_RATIO       = 1.0;     // maximum safe regen ratio
-const float MIN_PEDAL_TOLERANCE   = 0.05;    // anything less is basically zero
-const float FORWARD_VELOCITY      = 100.0f;  // velocity to use if forward
-const float REVERSE_VELOCITY      = -100.0f; // velocity to use if reverse
-const uint16_t DC_ID              = 0x00C7;  // For SC7
-const uint16_t DC_SER_NO          = 0x0042;  // Don't panic!
+const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
+const float    MAX_ACCEL_RATIO     = 0.8;     // maximum safe accel ratio
+const uint16_t MAX_REGEN_VOLTAGE   = 1024;    // max possible regen voltage
+const float    MAX_REGEN_RATIO     = 1.0;     // maximum safe regen ratio
+const float    MIN_PEDAL_TOLERANCE = 0.05;    // anything less is basically zero
+const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
+const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
+const uint16_t DC_ID               = 0x00C7;  // For SC7
+const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 
 // steering wheel parameters
-const byte GEAR_NEUTRAL = 0x3;
-const byte GEAR_FORWARD = 0x2;
-const byte GEAR_REVERSE = 0x1;
+const byte NEUTRAL_RAW = 0x3;
+const byte FORWARD_RAW = 0x2;
+const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT    = 0;   // value that corresponds to on for steering wheel data
 
 // driver control errors
@@ -278,13 +278,13 @@ void updateState() {
   }
   else { // accel or nothing engaged
     switch (state.gearRaw){
-    case GEAR_NEUTRAL:
+    case NEUTRAL_RAW:
       state.gear = NEUTRAL;
       break;
-    case GEAR_FORWARD:
+    case FORWARD_RAW:
       state.gear = FORWARD;
       break;
-    case GEAR_REVERSE:
+    case REVERSE_RAW:
       state.gear = REVERSE;
       break;
     default: // unknown gear
@@ -331,9 +331,12 @@ void updateState() {
     state.cruiseCtrlOn = true;
     state.cruiseCtrlRatio = state.accelRatio;
   }
-  else if (state.gear == BRAKE || state.gear == REGEN ||
+  if (state.gear == BRAKE || state.gear == REGEN ||
            !state.cruiseCtrl) { // regen pedal pressed or cruise control switched off
     state.cruiseCtrlOn = false;
+    state.cruiseCtrlPrev = true; // covers edge case where cruise control goes from off to on, 
+                                 // then brake is pressed and released before next packet comes in
+                                 // without this line, cruise control would come back on when brake is released
   }
   
   // update current values to be sent to motor controller
@@ -458,7 +461,7 @@ void setup() {
   // init car state
   state = {}; // init all members to 0
   state.gear = NEUTRAL;
-  state.gearRaw = GEAR_NEUTRAL;
+  state.gearRaw = NEUTRAL_RAW;
   state.wasReset = true;
     
   // set the watchdog timer interval
@@ -570,6 +573,8 @@ void loop() {
     Serial.println(state.hazards ? "ON" : "OFF");
     Serial.print("Cruise control: ");
     Serial.println(state.cruiseCtrl ? "ON" : "OFF");
+    Serial.print("Cruise control previous: ");
+    Serial.println(state.cruiseCtrlPrev ? "ON" : "OFF");
     Serial.print("Cruise control active: ");
     Serial.println(state.cruiseCtrlOn ? "YES" : "NO");
     Serial.print("Cruise control ratio: ");
