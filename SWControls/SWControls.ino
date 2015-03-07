@@ -2,8 +2,10 @@
 #include <Metro.h>
 #include <Switch.h>
 #include <serLCD.h>
-
+#include <avr/wdt.h>
 #include <SPI.h>
+
+#define LOOPBACK
  
  #define BIT(n)                   ( 1<<(n) ) 
  #define BIT_SET(y, mask)         ( y |=  (mask) ) 
@@ -51,7 +53,7 @@ const int LEFT = 1;
   //3rd: CAN Reception timer
   Metro CAN_RX = Metro(1000);
   //4th: Notification Timer
-  Metro notif_timer = Metro(2000,NOUPDATE_ON_CHECK);
+  Metro notif_timer = Metro(2000);
   //5th: Display Timer
   Metro display_timer = Metro(500);
   //6th: Turn signal blinking timer
@@ -76,8 +78,6 @@ CAN_IO CanControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
 
 Switch cruisecontrol(ccp);
 Switch horn(hornp);
-
-//boolean cruisecontroltoggle = false;
 
 serLCD screen(Serial1);
 
@@ -111,24 +111,30 @@ void setup() {
 /*SPST - left turn, right turn, horn, cruise control
 SPDT - forward/neutral/reverse, headlight/no light/hazard*/
 
-  //set Serial baud rate to 9600bps
-  Serial1.begin(9600);
-  Serial.begin(9600);
+  //set Serial and screen baud rate to 9600bps
+	Serial.begin(9600);
+	screen.begin();
+		while (digitalRead(hzp) == LOW) ; //Do nothing if hazards is on, allowing programming to happen.
 
- //CAN setup
-  CANFilterOpt filter;
-  filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
-  filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
-  CanControl.Setup(filter, &CAN_errors);
-  
-screen.begin();
-screen.clear();
-screen.setBrightness(25);
+	//CAN setup
+    CANFilterOpt filter;
+    filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
+    filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
+    CanControl.Setup(filter, &CAN_errors, RX0IE|RX1IE|ERRIE);
+     #ifdef LOOPBACK 
+     Serial.print("Set Loopback"); CanControl.controller.Mode(MODE_LOOPBACK); 
+     #endif
+     
+     // Enable WDT
+     /*pinMode(17, OUTPUT);  // Set RX LED as an output 
+     digitalWrite(17,HIGH); delay(500);
+     digitalWrite(17,LOW);    
+     wdt_enable(WDTO_4S);*/
 
 //Initialize turnsignal_on state
 steering_wheel.turnsignal_on = false;
 
-//screen.print("It works up to here");
+Serial.print("It works up to here");
 }
 
 inline void switchBitFromPin(byte pin, char& out, byte mask){
@@ -195,16 +201,6 @@ inline void defaultdisplay(){
   if(steering_wheel.RTdisplay){
     blnk(RIGHT,steering_wheel.turnsignal_on);
   }
-  /*else{
-    screen.setCursor(1,LEFT);
-    screen.print("  ");
-    screen.setCursor(2,LEFT);
-    screen.print("  ");
-    screen.setCursor(1,RIGHT);
-    screen.print("  ");
-    screen.setCursor(2,RIGHT);
-    screen.print("  ");
-  }*/
 }
 
 inline void displayNotification(){
@@ -237,7 +233,7 @@ void loop() {
   }
   
   if (old != young || display_timer.check()){
-    Serial.println(byte(~young),BIN);
+    //Serial.println(byte(~young),BIN);
     
     //Switch turnsignal_on on and off at regular intervals
     steering_wheel.turnsignal_on = !steering_wheel.turnsignal_on;
@@ -269,8 +265,6 @@ void loop() {
       notif_timer.reset();
     }
     if((~young & HAZARDLIGHT) && steering_wheel.Lightsdisplay != "HZ"){
-      Serial.print(steering_wheel.Lightsdisplay);
-      Serial.println(".");
       steering_wheel.Lightsdisplay = "HZ";
       situation = String("Hazardlights");
       notif_timer.reset();
@@ -302,7 +296,7 @@ void loop() {
     }
     else steering_wheel.RTdisplay = false;
     
-    if (!notif_timer.check()){
+    if (notif_timer.running()){
       displayNotification();
     }
     else{
@@ -315,36 +309,28 @@ void loop() {
       
   /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
     and reset CAN_TX timer.*/
-  //if(young != old || CAN_TX.check()){
-    //Serial.print("ERRORS:");
-    //Serial.println(CAN_errors,BIN);
-    //Serial.println(young,BIN);
-    //CanControl.Send(SW_Data(young),TXB0);
-    //CAN_TX.reset();
-    //old = young;
- // }
+  if(young != old || CAN_TX.check()){
+    CanControl.Send(SW_Data(young),TXB0);
+    Serial.print("Switches:");
+    Serial.println(young,BIN);
+    CAN_TX.reset();
+ }
 
- // if (CanControl.Available()){
-   /*Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures
+  if (CanControl.Available()){
+   /*Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures*/
     Frame& f = CanControl.Read();
-    if (f.id == MC_BUS_STATUS_ID){
-      MC_BusStatus receivedMC(f);
-      screen.selectLine(1);
-      screen.print("MC Bus Current: ");
-      screen.selectLine(2);
-      screen.print(receivedMC.bus_current);
+    if (f.id == BMS_SOC_ID){
+      BMS_SOC packet(f);
+      steering_wheel.SOCdisplay = packet.percent_SOC;
       CAN_RX.reset();
 	}
     else if (f.id == MC_VELOCITY_ID){
-      MC_Velocity receivedVel(f);
-      screen.selectLine(1);
-      screen.print("Velocity: ");
-      screen.selectLine(2);
-      screen.print(receivedVel.car_velocity);
+      MC_Velocity packet(f);
+      steering_wheel.Veldisplay = packet.car_velocity;
       CAN_RX.reset();
-    }*/
-  //}
-  //else if (CAN_RX.check()){
-  //  screen.print("Communic. lost  with DrivCont");
-  //}         
+    }
+  }
+  // else if (CAN_RX.check()){
+   // screen.print("Communic. lost  with DrivCont");
+  // }         
 }
