@@ -21,7 +21,7 @@
 #define HORN BIT(5)
 #define LEFT_TURN BIT(6)
 #define RIGHT_TURN BIT(7)
-char young = 1;
+char young = 0xFF;
 char old;
 
 //Steering Wheel LCD Info
@@ -175,7 +175,7 @@ inline void blnk(int a, boolean on){
 inline void defaultdisplay(){
   screen.clear();
   screen.setCursor(1,4);
-  screen.print("SOC  %");
+  screen.print("SOC:  %");
   screen.setCursor(1,SOC);
   screen.print(steering_wheel.SOCdisplay);
   screen.setCursor(1,LIGHT);
