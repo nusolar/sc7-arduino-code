@@ -121,10 +121,14 @@ void setup() {
    * THE HAZARDS POSITION.
    */  checkProgrammingMode();
 
-  //CAN setup
+  /*
+   * CAN Setup
+   * Configure RB0 to take SOC and Velocity packets for the display.
+   * RB1 can be used for other packets as needed.
+   */
   CANFilterOpt filter;
-  filter.setRB0(MASK_NONE,DC_DRIVE_ID,0);
-  filter.setRB1(MASK_NONE,DC_SWITCHPOS_ID,0,0,0);
+  filter.setRB0(MASK_Sxxx,BMS_SOC_ID,MC_VELOCITY_ID); 
+  filter.setRB1(MASK_Sxxx,0,0,0,0);
   CanControl.Setup(filter, &CAN_errors, RX0IE|RX1IE|ERRIE);
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
@@ -322,8 +326,7 @@ void loop() {
     }
   }
 
-  /*If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packetxxxxx
-   and reset CAN_TX timer.*/
+  //If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packet and reset CAN_TX timer.
   if(young != old || CAN_TX.check()){
     CanControl.Send(SW_Data(young),TXB0);
 #ifdef DEBUG
@@ -335,18 +338,27 @@ void loop() {
 
   wdt_reset();
 
+  // Check whether a 
   if (CanControl.Available()){
-    /*Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures*/
+    
+    // Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures
     Frame& f = CanControl.Read();
-    if (f.id == BMS_SOC_ID){
-      BMS_SOC packet(f);
-      steering_wheel.SOCdisplay = packet.percent_SOC;
-      CAN_RX.reset();
-    }
-    else if (f.id == MC_VELOCITY_ID){
-      MC_Velocity packet(f);
-      steering_wheel.Veldisplay = packet.car_velocity;
-      CAN_RX.reset();
+    switch (f.id)
+    {
+      case BMS_SOC_ID:
+      {
+        BMS_SOC packet(f);
+        steering_wheel.SOCdisplay = packet.percent_SOC;
+        CAN_RX.reset();
+        break;
+      }
+      case MC_VELOCITY_ID:
+      {
+        MC_Velocity packet(f);
+        steering_wheel.Veldisplay = packet.car_velocity;
+        CAN_RX.reset();
+        break;
+      }
     }
   }
   // else if (CAN_RX.check()){
