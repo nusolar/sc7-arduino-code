@@ -11,7 +11,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = true; // change to true to output debug info over serial
+const bool DEBUG = false; // change to true to output debug info over serial
 
 // pins
 const byte BRAKE_PIN      = 44;
@@ -29,12 +29,12 @@ const byte BOARDLED       = 13;
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
 const byte     FREQ      = 16;
-const uint16_t RXM0      = MASK_NONE;
-const uint16_t RXM1      = MASK_NONE;
-const uint16_t RXF0      = MASK_NONE;
+const uint16_t RXM0      = MASK_Sx00;
+const uint16_t RXM1      = MASK_Sxxx;
+const uint16_t RXF0      = SW_HEARTBEAT_ID;
 const uint16_t RXF1      = MASK_NONE;
-const uint16_t RXF2      = MASK_NONE;
-const uint16_t RXF3      = MASK_NONE;
+const uint16_t RXF2      = MC_HEARTBEAT_ID;
+const uint16_t RXF3      = BMS_HEARTBEAT_ID;
 const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
 
