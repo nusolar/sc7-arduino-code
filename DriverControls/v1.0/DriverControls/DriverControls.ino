@@ -98,8 +98,8 @@ struct CarState {
   bool cruiseCtrl;    // true if driver wants cruise control on
   
   // motor info
-  float motorVelocity;
-  float carVelocity;
+  float motorVelocity; // velocity of motor in rpm
+  float carVelocity;   // velocity of car in mph
   float busCurrent;
   
   // bms info
