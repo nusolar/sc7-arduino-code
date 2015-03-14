@@ -11,4 +11,4 @@
 	This is the library header include file for the sc7-can code
 	*/
 
-#include "C:/NUsolar/sc7-can/v1.0/CAN_IO.h"
+#include "C:/NUsolar/sc7-can/v2.0/CAN_IO.h"

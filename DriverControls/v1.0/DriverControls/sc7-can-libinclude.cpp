@@ -10,6 +10,6 @@
 
 	This is the library include file for the sc7-can code
 	*/
-#include "C:/NUsolar/sc7-can/v1.0/CAN_IO.cpp"
-#include "C:/NUsolar/sc7-can/v1.0/Layouts.cpp"
-#include "C:/NUsolar/sc7-can/v1.0/MCP2515.cpp"
+#include "C:/NUsolar/sc7-can/v2.0/CAN_IO.cpp"
+#include "C:/NUsolar/sc7-can/v2.0/Layouts.cpp"
+#include "C:/NUsolar/sc7-can/v2.0/MCP2515.cpp"
