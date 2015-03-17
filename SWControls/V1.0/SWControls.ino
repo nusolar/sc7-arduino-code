@@ -110,7 +110,8 @@ LCD steering_wheel;
 String situation;
 
 void setup() {
-  delay(100); //ask alexander
+  delay(100); // Allow MCP2515 to run for 128 cycles
+  
   // Pin Modes
   pinMode(fgp, INPUT_PULLUP);
   pinMode(rgp, INPUT_PULLUP);
@@ -130,7 +131,7 @@ void setup() {
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
    * PROGRAMMING BY SETTING HAZARD/HEADLIGHT SWITCH TO
    * THE HAZARDS POSITION.
-   */  checkProgrammingMode(); // ask alexander
+   */  checkProgrammingMode();
 
   /*
    * CAN Setup
@@ -380,8 +381,9 @@ void loop() {
     }
   }
   // else if (CAN_RX.check()){
-  // screen.print("Communic. lost  with DrivCont");
-  // }         
+  // 	notif_timer().reset();
+  // 	situation = "Comm. lost with Driver Controls!"
+  // } I guess we'll implement this later, since it hasn't been checked. 
 }
 
 /*
