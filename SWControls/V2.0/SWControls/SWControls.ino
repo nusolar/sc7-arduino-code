@@ -90,7 +90,7 @@ Switch cruisecontrol(ccp);
 Switch horn(hornp);
 
 //Declaring serLCD object (display, based on the NUserLCD library)
-serLCD screen(Serial1);
+serLCD_buffered screen(Serial1);
 
 //setup a display structure to store the shenanigans that we neeed to display on LCD
 struct LCD{
@@ -125,7 +125,6 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
-  //screen.print("HELLOWORLD");
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
@@ -155,6 +154,10 @@ void setup() {
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
+  
+  //Print Team Name
+  //screen.print("NUSOLAR"); screen.update();
+  
 #ifdef DEBUG
   Serial.print("It works up to here");
 #endif
@@ -343,6 +346,8 @@ void loop() {
     else{
       defaultdisplay();
     }
+    
+    screen.update();
   }
 
   //If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packet and reset CAN_TX timer.
@@ -399,9 +404,12 @@ void checkProgrammingMode()
     //This delay must go before the screen printing, for some random reason.
     //Also, do not call screen.clear in here.
     delay(500); 
+    screen.home();
     screen.print("Turn off Hazards to Exit PrgMd  ");
+    screen.update();
   }
 }
+
 
 
 
