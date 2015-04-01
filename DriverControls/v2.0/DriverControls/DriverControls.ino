@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <Metro.h>
 #include <SPI.h>
+#include <math.h>
 #include "sc7-can-libinclude.h"
 
 //------------------------------CONSTANTS----------------------------//
@@ -33,7 +34,7 @@ const uint16_t RXM0      = MASK_Sx00;
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF0      = SW_HEARTBEAT_ID;
 const uint16_t RXF1      = MASK_NONE;
-const uint16_t RXF2      = MC_HEARTBEAT_ID;
+const uint16_t RXF2      = MC_VELOCITY_ID;
 const uint16_t RXF3      = BMS_HEARTBEAT_ID;
 const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
@@ -57,6 +58,8 @@ const float    MAX_REGEN_RATIO     = 1.0;     // maximum safe regen ratio
 const float    MIN_PEDAL_TOLERANCE = 0.05;    // anything less is basically zero
 const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
+const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
+const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 
@@ -64,7 +67,7 @@ const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 const byte NEUTRAL_RAW = 0x3;
 const byte FORWARD_RAW = 0x2;
 const byte REVERSE_RAW = 0x1;
-const byte SW_ON_BIT    = 0;   // value that corresponds to on for steering wheel data
+const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -98,8 +101,8 @@ struct CarState {
   //bool cruiseCtrl;    // true if driver wants cruise control on
   
   // motor info
-  float motorVelocity;
-  float carVelocity;
+  float motorVelocity;  // rotational speed of motor (rpm)
+  float carVelocity;    // velocity of car (mph)
   float busCurrent;
   
   // bms info
@@ -202,7 +205,7 @@ void readCAN() {
     else if (f.id == MC_VELOCITY_ID) { // motor controller velocity
       MC_Velocity packet(f);
       state.motorVelocity = packet.motor_velocity;
-      state.carVelocity = packet.car_velocity;
+      state.carVelocity = packet.car_velocity * M_PER_S_TO_MPH;
     }
     else if (f.id == BMS_SOC_ID) { // bms state of charge
       BMS_SOC packet(f);
@@ -279,13 +282,19 @@ void updateState() {
   else { // accel or nothing engaged
     switch (state.gearRaw){
     case NEUTRAL_RAW:
-      state.gear = NEUTRAL;
+      state.gear = NEUTRAL; // can always change to neutral
       break;
     case FORWARD_RAW:
-      state.gear = FORWARD;
+      if (fabs(state.carVelocity) < GEAR_CHANGE_CUTOFF || 
+          state.carVelcotity > 0.0f) { // going forward or velocity less than cutoff, gear switch ok
+        state.gear = FORWARD;
+      }
       break;
     case REVERSE_RAW:
-      state.gear = REVERSE;
+      if (fabs(state.carVelocity) < GEAR_CHANGE_CUTOFF ||
+          state.carVelocity < 0.0f) { // going backward or velocity less than cutoff, gear switch ok
+        state.gear = REVERSE;
+      }
       break;
     default: // unknown gear
       state.gear = NEUTRAL; // safe default gear?
@@ -294,7 +303,7 @@ void updateState() {
     }
   }
   
-  // update top shell state
+  // update lights state
   // check hazards
   if (state.hazards) { // hazards active
     if (hazardsTimer.check()) { // timer expired, toggle
