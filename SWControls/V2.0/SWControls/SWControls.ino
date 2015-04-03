@@ -124,13 +124,13 @@ inline void initialize()
   }
   
   if(digitalRead(hp)){
-    steering_wheel.Lightsdisplay = "H";
+    steering_wheel.Lightsdisplay = "H ";
   }
   else if(digitalRead(hzp)){
     steering_wheel.Lightsdisplay = "HZ";
   }
   else if(~digitalRead(hzp) && ~digitalRead(hp)){
-    steering_wheel.Lightsdisplay = " ";
+    steering_wheel.Lightsdisplay = "  ";
   }
 }
 
