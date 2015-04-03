@@ -109,6 +109,31 @@ LCD steering_wheel;
 //declares the string that will contain the information that will be displayed in the notification
 String situation;
 
+inline void initialize()
+{
+  steering_wheel.CCdisplay = ' ';
+  
+  if(digitalRead(fgp)){
+    steering_wheel.geardisplay = 'F';
+  }
+  else if(digitalRead(rgp)){
+    steering_wheel.geardisplay = 'R';
+  }
+  else if(~digitalRead(rgp) && ~digitalRead(fgp)){
+    steering_wheel.geardisplay = 'N';
+  }
+  
+  if(digitalRead(hp)){
+    steering_wheel.Lightsdisplay = "H";
+  }
+  else if(digitalRead(hzp)){
+    steering_wheel.Lightsdisplay = "HZ";
+  }
+  else if(~digitalRead(hzp) && ~digitalRead(hp)){
+    steering_wheel.Lightsdisplay = " ";
+  }
+}
+
 void setup() {
   delay(100); // Allow MCP2515 to run for 128 cycles
   
@@ -121,6 +146,8 @@ void setup() {
   pinMode(hornp, INPUT_PULLUP);
   pinMode(ltp, INPUT_PULLUP);
   pinMode(rtp, INPUT_PULLUP);
+  
+  initialize();
 
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
@@ -223,11 +250,11 @@ inline void defaultdisplay(){
   screen.print(steering_wheel.CCdisplay);
   screen.setCursor(2,GEAR);
   screen.print(steering_wheel.geardisplay);
-  if(steering_wheel.LTdisplay){
+  if(steering_wheel.LTdisplay || steering_wheel.Lightsdisplay=="HZ"){
     blnk(LEFT,steering_wheel.turnsignal_on);
   }
 
-  if(steering_wheel.RTdisplay){
+  if(steering_wheel.RTdisplay || steering_wheel.Lightsdisplay=="HZ"){
     blnk(RIGHT,steering_wheel.turnsignal_on);
   }
 }
