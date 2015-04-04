@@ -118,7 +118,6 @@ void initializePins();
 void checkProgrammingMode();
 
 void setup() {
-  delay(100); // Allow MCP2515 to run for 128 cycles
   
   // Pin Modes
   pinMode(fgp, INPUT_PULLUP);
@@ -133,6 +132,7 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
+  delay(500); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
@@ -398,10 +398,10 @@ void checkProgrammingMode()
     //Do nothing if hazards is on, allowing programming to happen.
     //This delay must go before the screen printing, for some random reason.
     //Also, do not call screen.clear in here.
-    delay(500); 
     screen.home();
     screen.print("Turn off Hazards to Exit PrgMd  ");
     screen.update();
+    delay(500); 
   }
 }
 
@@ -409,25 +409,26 @@ inline void initializePins()
 {
   steering_wheel.CCdisplay = ' ';
   
-  if(digitalRead(fgp)){
+  if(digitalRead(fgp) == LOW){
     steering_wheel.geardisplay = 'F';
   }
-  else if(digitalRead(rgp)){
+  else if(digitalRead(rgp) == LOW){
     steering_wheel.geardisplay = 'R';
   }
   else {
     steering_wheel.geardisplay = 'N';
   }
   
-  if(digitalRead(hp)){
+  if(digitalRead(hp) == LOW){
     steering_wheel.Lightsdisplay = "H ";
   }
-  else if(digitalRead(hzp)){
+  else if(digitalRead(hzp) == LOW){
     steering_wheel.Lightsdisplay = "HZ";
   }
   else {
     steering_wheel.Lightsdisplay = "  ";
   }
 }
+
 
 
