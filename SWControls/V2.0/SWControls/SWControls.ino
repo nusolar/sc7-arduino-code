@@ -62,7 +62,7 @@ Metro CAN_TX = Metro(1000);
 //3rd: CAN Reception timer - duration between CAN packets received (will trigger error if it expires)
 Metro CAN_RX = Metro(1000);
 //4th: Notification Timer - duration for which notification is displayed
-Metro notif_timer = Metro(2000);
+Metro notif_timer = Metro(1000);
 //5th: Display Timer - frequency at which display will refresh if nothing changes
 Metro display_timer = Metro(500);
 //6th: Turn signal blinking timer
