@@ -12,7 +12,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = false; // change to true to output debug info over serial
+const bool DEBUG = true; // change to true to output debug info over serial
 
 // pins
 const byte BRAKE_PIN      = 44;
@@ -205,7 +205,7 @@ void readCAN() {
     else if (f.id == MC_VELOCITY_ID) { // motor controller velocity
       MC_Velocity packet(f);
       state.motorVelocity = packet.motor_velocity;
-      state.carVelocity = packet.car_velocity * M_PER_S_TO_MPH;
+      state.carVelocity = packet.car_velocity * M_PER_SEC_TO_MPH;
     }
     else if (f.id == BMS_SOC_ID) { // bms state of charge
       BMS_SOC packet(f);
@@ -286,7 +286,7 @@ void updateState() {
       break;
     case FORWARD_RAW:
       if (fabs(state.carVelocity) < GEAR_CHANGE_CUTOFF || 
-          state.carVelcotity > 0.0f) { // going forward or velocity less than cutoff, gear switch ok
+          state.carVelocity > 0.0f) { // going forward or velocity less than cutoff, gear switch ok
         state.gear = FORWARD;
       }
       break;
@@ -403,7 +403,7 @@ void writeCAN() {
       break;
     case BRAKE: // do regen while braking
       MCvelocity = 0;
-      MCcurrent = MAX_REGEN_RATIO;
+      MCcurrent = state.regenCurrent;
       break;
     case NEUTRAL: // coast
       MCvelocity = 0;
