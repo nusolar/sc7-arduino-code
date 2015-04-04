@@ -102,37 +102,20 @@ struct LCD{
   boolean LTdisplay;     //distinguishes left turn
   boolean RTdisplay;     //distinguishes right turn
   boolean turnsignal_on; //whether turn signal is on/off
-  //char notification[16]; //notification string
+  String notification; //notification string
 };
 LCD steering_wheel;
 
-//declares the string that will contain the information that will be displayed in the notification
-String situation;
-
-inline void initialize()
-{
-  steering_wheel.CCdisplay = ' ';
-  
-  if(digitalRead(fgp)){
-    steering_wheel.geardisplay = 'F';
-  }
-  else if(digitalRead(rgp)){
-    steering_wheel.geardisplay = 'R';
-  }
-  else if(~digitalRead(rgp) && ~digitalRead(fgp)){
-    steering_wheel.geardisplay = 'N';
-  }
-  
-  if(digitalRead(hp)){
-    steering_wheel.Lightsdisplay = "H ";
-  }
-  else if(digitalRead(hzp)){
-    steering_wheel.Lightsdisplay = "HZ";
-  }
-  else if(~digitalRead(hzp) && ~digitalRead(hp)){
-    steering_wheel.Lightsdisplay = "  ";
-  }
-}
+//declare functions
+void setup();
+void switchBitFromPin();
+void switchBit();
+void blnk();
+void defaultDisplay();
+void displayNotification();
+void loop();
+void initializePins();
+void checkProgrammingMode();
 
 void setup() {
   delay(100); // Allow MCP2515 to run for 128 cycles
@@ -146,8 +129,6 @@ void setup() {
   pinMode(hornp, INPUT_PULLUP);
   pinMode(ltp, INPUT_PULLUP);
   pinMode(rtp, INPUT_PULLUP);
-  
-  initialize();
 
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
@@ -159,6 +140,8 @@ void setup() {
    * THE HAZARDS POSITION.
    */  checkProgrammingMode();
 
+  // Initialize the pin states
+  initializePins();
   /*
    * CAN Setup
    * Configure RB0 to take SOC and Velocity packets for the display.
@@ -174,16 +157,10 @@ void setup() {
 #endif
 
   // Enable WDT
-  /*pinMode(17, OUTPUT);  // Set RX LED as an output 
-   digitalWrite(17,HIGH); delay(500);
-   digitalWrite(17,LOW);    */
   wdt_enable(WDTO_4S);
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
-  
-  //Print Team Name
-  //screen.print("NUSOLAR"); screen.update();
   
 #ifdef DEBUG
   Serial.print("It works up to here");
@@ -263,7 +240,7 @@ inline void defaultdisplay(){
 inline void displayNotification(){
   screen.clear();
   screen.selectLine(1);
-  screen.print(situation);
+  screen.print(steering_wheel.notification);
 }
 
 
@@ -307,53 +284,44 @@ void loop() {
 
     if(!(~young & (FWD_GEAR|REV_GEAR)) && steering_wheel.geardisplay != 'N'){
       steering_wheel.geardisplay = 'N';
-      situation = String("Neutral Gear");
+      steering_wheel.notification = String("Neutral Gear");
       notif_timer.reset();
-#ifdef DEBUG
-      Serial.print("ResetNEU"); //ask
-#endif
     }
     if((~young & FWD_GEAR) && steering_wheel.geardisplay != 'F'){
       steering_wheel.geardisplay = 'F';
-      situation = String("Forward Gear");
+      steering_wheel.notification = String("Forward Gear");
       notif_timer.reset();
-#ifdef DEBUG
-      Serial.print("ResetFWD");
-#endif
     }
     if((~young & REV_GEAR) && steering_wheel.geardisplay != 'R'){
       steering_wheel.geardisplay = 'R';
-      situation = String("Reverse Gear");
+      steering_wheel.notification = String("Reverse Gear");
       notif_timer.reset();
-#ifdef DEBUG
-      Serial.print("ResetREV");
-#endif
     }
 
     if((~young & HEADLIGHT) && steering_wheel.Lightsdisplay != "H "){
       steering_wheel.Lightsdisplay = "H ";
-      situation = String("Headlights");
+      steering_wheel.notification = String("Headlights");
       notif_timer.reset();
     }
     if((~young & HAZARDLIGHT) && steering_wheel.Lightsdisplay != "HZ"){
       steering_wheel.Lightsdisplay = "HZ";
-      situation = String("Hazardlights");
+      steering_wheel.notification = String("Hazardlights");
       notif_timer.reset();
     } 
     if(!(~young & (HAZARDLIGHT|HEADLIGHT)) && steering_wheel.Lightsdisplay != "  "){
       steering_wheel.Lightsdisplay = "  ";
-      situation = String("All lights off");
+      steering_wheel.notification = String("All lights off");
       notif_timer.reset();
     }
 
     if((~young & CRUISE_CONTROL) && steering_wheel.CCdisplay != 'C'){
       steering_wheel.CCdisplay = 'C';
-      situation = String("CruiseControl on");
+      steering_wheel.notification = String("CruiseControl on");
       notif_timer.reset();
     }  
     if((young & CRUISE_CONTROL) && steering_wheel.CCdisplay != ' '){
       steering_wheel.CCdisplay = ' ';
-      situation = String("CruiseControlOff");
+      steering_wheel.notification = String("CruiseControlOff");
       notif_timer.reset();
     }
 
@@ -414,7 +382,7 @@ void loop() {
   }
   // else if (CAN_RX.check()){
   // 	notif_timer().reset();
-  // 	situation = "Comm. lost with Driver Controls!"
+  // 	steering_wheel.notification = "Comm. lost with Driver Controls!"
   // } I guess we'll implement this later, since it hasn't been checked. 
 }
 
@@ -437,6 +405,29 @@ void checkProgrammingMode()
   }
 }
 
-
+inline void initializePins()
+{
+  steering_wheel.CCdisplay = ' ';
+  
+  if(digitalRead(fgp)){
+    steering_wheel.geardisplay = 'F';
+  }
+  else if(digitalRead(rgp)){
+    steering_wheel.geardisplay = 'R';
+  }
+  else {
+    steering_wheel.geardisplay = 'N';
+  }
+  
+  if(digitalRead(hp)){
+    steering_wheel.Lightsdisplay = "H ";
+  }
+  else if(digitalRead(hzp)){
+    steering_wheel.Lightsdisplay = "HZ";
+  }
+  else {
+    steering_wheel.Lightsdisplay = "  ";
+  }
+}
 
 
