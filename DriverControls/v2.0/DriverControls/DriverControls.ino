@@ -435,7 +435,7 @@ void writeCAN() {
   if (dcInfoTimer.check()) {
     // create and send packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
-                            state.canErrorFlags, state.dcErrorFlags, state.wasReset), TXB2);
+                            state.canErrorFlags, state.dcErrorFlags, state.wasReset,state.gear), TXB2);
     
     // reset timer
     dcInfoTimer.reset();
