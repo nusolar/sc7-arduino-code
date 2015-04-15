@@ -15,16 +15,16 @@
 const bool DEBUG = true; // change to true to output debug info over serial
 
 // pins
-const byte BRAKE_PIN      = 44;
-const byte ACCEL_PIN      = 4;
-const byte REGEN_PIN      = 3;
-const byte INTERRUPT_PIN  = 5;
-const byte CS_PIN         = 4;
-const byte HORN_PIN       = 6;
-const byte RIGHT_TURN_PIN = 7;
-const byte LEFT_TURN_PIN  = 8;
-const byte HEADLIGHT_PIN  = 9;
-const byte BRAKELIGHT_PIN = 10;
+const byte BRAKE_PIN      = 9;
+const byte ACCEL_PIN      = A0;
+const byte REGEN_PIN      = A1;
+const byte INTERRUPT_PIN  = 7;
+const byte CS_PIN         = 3;
+const byte HORN_PIN       = 2;
+const byte RIGHT_TURN_PIN = 11;
+const byte LEFT_TURN_PIN  = 12;
+const byte HEADLIGHT_PIN  = 10;
+const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
 
 // CAN parameters
