@@ -15,6 +15,7 @@
 const bool DEBUG = true; // change to true to output debug info over serial
 
 // pins
+const byte IGNITION_PIN   = 53;
 const byte BRAKE_PIN      = 9;
 const byte ACCEL_PIN      = A0;
 const byte REGEN_PIN      = A1;
@@ -33,7 +34,7 @@ const byte     FREQ      = 16;
 const uint16_t RXM0      = MASK_Sx00;
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF0      = SW_HEARTBEAT_ID;
-const uint16_t RXF1      = MASK_NONE;
+const uint16_t RXF1      = BMS_VOLT_CURR_ID;
 const uint16_t RXF2      = MC_VELOCITY_ID;
 const uint16_t RXF3      = BMS_HEARTBEAT_ID;
 const uint16_t RXF4      = MASK_NONE;
@@ -142,6 +143,7 @@ struct CarState {
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
   byte dcErrorFlags;      // keep track of other errors
+  bool BMSCurrentError;   // need to send can packets immediately to the BMS.
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -179,7 +181,20 @@ void readInputs() {
   state.accelRaw = analogRead(ACCEL_PIN);
   state.regenRaw = analogRead(REGEN_PIN);
 
+  /*
   // read ignition key here
+  if (digitalRead(IGNITION_PIN) == LOW)
+     state.ignition = Ignition_Start;
+  else
+     state.ignition = Ignition_Run;
+  */
+     
+  if (digitalRead(49) == LOW)
+    state.ignition = Ignition_Start;
+  if (digitalRead(50) == LOW)
+    state.ignition = Ignition_Run;
+  if (digitalRead(51) == LOW)
+    state.ignition = Ignition_Park;
 
 }
 
@@ -240,6 +255,7 @@ void readCAN() {
     	if (packet.current >= TRIP_CURRENT_THRESH) {
     		state.ignition = Ignition_Park; // KILL THE BATTERIES
     		state.dcErrorFlags |= BMSOVERCURR;
+                state.BMSCurrentError = true;
     	}
     }
   }
@@ -401,7 +417,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check()) { // ready to send drive command
+  if (dcDriveTimer.check() || state.BMSCurrentError ) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -438,6 +454,10 @@ void writeCAN() {
     // reset timer
     dcDriveTimer.reset();
     
+    // reset any BMS error that occured which caused us to send this packet immediately.
+    if (state.BMSCurrentError)
+       state.BMSCurrentError = false;
+       
     delay(10); // mcp2515 seems to require small delay
 
   }
@@ -470,6 +490,7 @@ void writeCAN() {
 //--------------------------MAIN FUNCTIONS---------------------------//
 void setup() {
   // setup pin I/O
+  pinMode(IGNITION_PIN, INPUT_PULLUP);
   pinMode(BRAKE_PIN, INPUT_PULLUP);
   pinMode(HORN_PIN, OUTPUT);
   pinMode(HEADLIGHT_PIN, OUTPUT);
@@ -478,13 +499,17 @@ void setup() {
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
   
+  pinMode(49, INPUT_PULLUP);
+  pinMode(50, INPUT_PULLUP);
+  pinMode(51, INPUT_PULLUP);
+  
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
   // debugging [ For some reason the board doesn't work unless I do this here instead of at the bottom ]
-  if (DEBUG) {
+  //if (DEBUG) {
     Serial.begin(9600);
     Serial.println("Serial Initialized");
-  }
+  //}
   
   // setup CAN
   CANFilterOpt filters;
@@ -497,7 +522,7 @@ void setup() {
   state.gear = FORWARD;
   state.gearRaw = FORWARD_RAW;
   state.wasReset = true;
-  state.ignition = Ignition_Start;
+  state.ignition = Ignition_Run;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -553,7 +578,9 @@ void loop() {
   // debugging
   if (DEBUG && debugTimer.check()) {
     debugStartTime = millis();
-
+    Serial.print("Ignition: ");
+  Serial.println(state.ignition,HEX);
+/*
     Serial.print("Loop time: ");
     Serial.println(debugStartTime - debugEndTime);
     Serial.print("System time: ");
@@ -625,7 +652,7 @@ void loop() {
     Serial.println();
     
     debugEndTime = millis();
-    
+    */
     debugTimer.reset();
   }
   
