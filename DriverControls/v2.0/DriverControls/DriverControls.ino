@@ -44,7 +44,7 @@ const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
 const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 50;    // drive command packet
-const uint16_t DC_INFO_INTERVAL  = 200;   // driver controls info packet
+const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
@@ -69,11 +69,15 @@ const byte FORWARD_RAW = 0x2;
 const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
 
+// BMS parameters
+const float TRIP_CURRENT_THRESH		= 5000
+
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
 const uint16_t BMS_TIMEOUT = 0x02; // bms timed out
 const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
+const uint16_t BMSOVERCURR = 0x10; // Detected BMS overcurrent, tripped car.
 
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
@@ -133,7 +137,8 @@ struct CarState {
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
-  
+  uint16_t ignition;	// state of the ignition key (ENUM defined in the CAN library Layouts.h file)
+
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
   byte dcErrorFlags;      // keep track of other errors
@@ -173,6 +178,9 @@ void readInputs() {
   // read accel and regen pedals pedal
   state.accelRaw = analogRead(ACCEL_PIN);
   state.regenRaw = analogRead(REGEN_PIN);
+
+  // read ignition key here
+
 }
 
 /*
@@ -225,7 +233,15 @@ void readCAN() {
       // read cruise control
       //state.cruiseCtrlPrev = state.cruiseCtrl;
       //state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
-    }  
+    }
+    else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
+    	BMS_VOLT_CURR_ID packet(f);
+
+    	if (packet.current >= TRIP_CURRENT_THRESH) {
+    		state.ignition = IgnitionState::Park; // KILL THE BATTERIES
+    		state.dcErrorFlags |= BMSOVERCURR;
+    	}
+    }
   }
 }
 
@@ -413,29 +429,35 @@ void writeCAN() {
     
     // create and send packet
     canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXB0);
+
+    delay(10);
+
+    // Send BMS Ignition Packet
+    canControl.Send(DC_Switchpos(state.ignition),TXB2)
     
     // reset timer
     dcDriveTimer.reset();
     
     delay(10); // mcp2515 seems to require small delay
+
   }
   
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB1);
-    
+
     // reset timer
     dcHbTimer.reset(); 
     
-    delay(10);
+   	delay(10);
   }
   
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.check()) {
     // create and send packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
-                            state.canErrorFlags, state.dcErrorFlags, state.wasReset,state.gear), TXB2);
+                            state.canErrorFlags, state.dcErrorFlags, state.wasReset,state.gear), TXB0);
     
     // reset timer
     dcInfoTimer.reset();
@@ -475,6 +497,7 @@ void setup() {
   state.gear = NEUTRAL;
   state.gearRaw = NEUTRAL_RAW;
   state.wasReset = true;
+  state.ignition = IgnitionState::Start
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
