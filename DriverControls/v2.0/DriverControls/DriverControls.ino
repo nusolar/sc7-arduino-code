@@ -70,7 +70,7 @@ const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
 
 // BMS parameters
-const float TRIP_CURRENT_THRESH		= 5000
+const float TRIP_CURRENT_THRESH		= 5000;
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -137,7 +137,7 @@ struct CarState {
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
-  uint16_t ignition;	// state of the ignition key (ENUM defined in the CAN library Layouts.h file)
+  IgnitionState ignition;	// state of the ignition key (ENUM defined in the CAN library Layouts.h file)
 
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
@@ -235,10 +235,10 @@ void readCAN() {
       //state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
     }
     else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
-    	BMS_VOLT_CURR_ID packet(f);
+    	BMS_VoltageCurrent packet(f);
 
     	if (packet.current >= TRIP_CURRENT_THRESH) {
-    		state.ignition = IgnitionState::Park; // KILL THE BATTERIES
+    		state.ignition = Ignition_Park; // KILL THE BATTERIES
     		state.dcErrorFlags |= BMSOVERCURR;
     	}
     }
@@ -433,7 +433,7 @@ void writeCAN() {
     delay(10);
 
     // Send BMS Ignition Packet
-    canControl.Send(DC_Switchpos(state.ignition),TXB2)
+    canControl.Send(DC_SwitchPos(state.ignition),TXB2);
     
     // reset timer
     dcDriveTimer.reset();
@@ -494,10 +494,10 @@ void setup() {
 
   // init car state
   state = {}; // init all members to 0
-  state.gear = NEUTRAL;
-  state.gearRaw = NEUTRAL_RAW;
+  state.gear = FORWARD;
+  state.gearRaw = FORWARD_RAW;
   state.wasReset = true;
-  state.ignition = IgnitionState::Start
+  state.ignition = Ignition_Start;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -590,6 +590,8 @@ void loop() {
       Serial.println("NEUTRAL");
       break;
     }
+    Serial.print("Ignition: ");
+    Serial.println(state.ignition,HEX);
     Serial.print("Horn: ");
     Serial.println(state.horn ? "ON" : "OFF");
     Serial.print("Headlights: ");
