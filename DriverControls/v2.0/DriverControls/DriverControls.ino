@@ -13,6 +13,7 @@
 //------------------------------CONSTANTS----------------------------//
 // debugging
 const bool DEBUG = true; // change to true to output debug info over serial
+byte       debugStep = 0; // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 
 // pins
 const byte IGNITION_PIN   = 53;
@@ -49,7 +50,8 @@ const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
-const uint16_t DEBUG_INTERVAL    = 1000;  // interval for debug output
+const uint16_t DEBUG_INTERVAL    = 333;  // interval for debug calls output
+const uint16_t SERIAL_BAUD       = 115200; // baudrate for serial (maximum)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -78,13 +80,18 @@ const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
 const uint16_t BMS_TIMEOUT = 0x02; // bms timed out
 const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
-const uint16_t BMSOVERCURR = 0x10; // Detected BMS overcurrent, tripped car.
+const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
 
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
  * Enum to represet the possible gear states.
  */
 enum GearState { BRAKE, FORWARD, REVERSE, REGEN, NEUTRAL };
+
+/*
+ * Enum to represent ignition states
+ */
+enum IgnitionState { Ignition_Start = 0x0040, Ignition_Run = 0x0020, Ignition_Park = 0x0010 };
 
 /*
  * Struct to hold informations about the car state.
@@ -132,18 +139,18 @@ struct CarState {
   //bool cruiseCtrlPrev;   // prev value of cruiseCtrl
   //float cruiseCtrlRatio; // pedal ratio to use if cruise control active
                     
-  // gearing
-  GearState gear; // brake, foward, reverse, regen, neutral
+  // gearing and ignition
+  GearState gear;               // brake, foward, reverse, regen, neutral
+  IgnitionState ignition;	// start, run, park
   
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
-  IgnitionState ignition;	// state of the ignition key (ENUM defined in the CAN library Layouts.h file)
+
 
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
-  byte dcErrorFlags;      // keep track of other errors
-  bool BMSCurrentError;   // need to send can packets immediately to the BMS.
+  uint16_t dcErrorFlags;  // keep track of other errors
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -254,8 +261,7 @@ void readCAN() {
 
     	if (packet.current >= TRIP_CURRENT_THRESH) {
     		state.ignition = Ignition_Park; // KILL THE BATTERIES
-    		state.dcErrorFlags |= BMSOVERCURR;
-                state.BMSCurrentError = true;
+    		state.dcErrorFlags |= BMS_OVER_CURR;
     	}
     }
   }
@@ -417,7 +423,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check() || state.BMSCurrentError ) { // ready to send drive command
+  if (dcDriveTimer.check() || state.dcErrorFlags & BMS_OVER_CURR ) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -455,8 +461,7 @@ void writeCAN() {
     dcDriveTimer.reset();
     
     // reset any BMS error that occured which caused us to send this packet immediately.
-    if (state.BMSCurrentError)
-       state.BMSCurrentError = false;
+    state.dcErrorFlags &= ~BMS_OVER_CURR;
        
     delay(10); // mcp2515 seems to require small delay
 
@@ -506,10 +511,10 @@ void setup() {
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
   // debugging [ For some reason the board doesn't work unless I do this here instead of at the bottom ]
-  //if (DEBUG) {
-    Serial.begin(9600);
+  if (DEBUG) {
+    Serial.begin(SERIAL_BAUD);
     Serial.println("Serial Initialized");
-  //}
+  }
   
   // setup CAN
   CANFilterOpt filters;
@@ -578,81 +583,91 @@ void loop() {
   // debugging
   if (DEBUG && debugTimer.check()) {
     debugStartTime = millis();
-    Serial.print("Ignition: ");
-  Serial.println(state.ignition,HEX);
-/*
     Serial.print("Loop time: ");
     Serial.println(debugStartTime - debugEndTime);
     Serial.print("System time: ");
     Serial.println(millis());
-    Serial.print("Brake pin: ");
-    Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
-    Serial.print("Accel pedal raw: ");
-    Serial.println(state.accelRaw);
-    Serial.print("Accel ratio: ");
-    Serial.println(state.accelRatio);
-    Serial.print("Accel current: ");
-    Serial.println(state.accelCurrent);
-    Serial.print("Regen pedal raw: ");
-    Serial.println(state.regenRaw);
-    Serial.print("Regen ratio: ");
-    Serial.println(state.regenRatio);
-    Serial.print("Regen current: ");
-    Serial.println(state.regenCurrent);
-    Serial.print("Gear: ");
-    switch (state.gear) {
-    case BRAKE:
-      Serial.println("BRAKE");
+    switch (debugStep)
+    {
+      case 0:
+        Serial.print("Brake pin: ");
+        Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
+        Serial.print("Accel pedal raw: ");
+        Serial.println(state.accelRaw);
+        Serial.print("Accel ratio: ");
+        Serial.println(state.accelRatio);
+        Serial.print("Accel current: ");
+        Serial.println(state.accelCurrent);
+        Serial.print("Regen pedal raw: ");
+        Serial.println(state.regenRaw);
+        Serial.print("Regen ratio: ");
+        Serial.println(state.regenRatio);
+        Serial.print("Regen current: ");
+        Serial.println(state.regenCurrent);
+        Serial.print("Gear: ");
+        switch (state.gear) {
+        case BRAKE:
+          Serial.println("BRAKE");
+          break;
+        case FORWARD:
+          Serial.println("FORWARD");
+          break;
+        case REVERSE:
+          Serial.println("REVERSE");
+          break;
+        case REGEN:
+          Serial.println("REGEN");
+          break;
+        case NEUTRAL:
+          Serial.println("NEUTRAL");
+          break;
+        }
       break;
-    case FORWARD:
-      Serial.println("FORWARD");
+      ///////////////////
+      case 1:
+        Serial.print("Ignition: ");
+        Serial.println(state.ignition,HEX);
+        Serial.print("Horn: ");
+        Serial.println(state.horn ? "ON" : "OFF");
+        Serial.print("Headlights: ");
+        Serial.println(state.headlights ? "ON" : "OFF");
+        Serial.print("Brakelights: ");
+        Serial.println(state.brakeEngaged ? "ON" : "OFF");
+        Serial.print("Right turn signal: ");
+        Serial.println(state.rightTurn ? "ON" : "OFF");
+        Serial.print("Right turn singal active: ");
+        Serial.println(state.rightTurnOn ? "YES" : "NO");
+        Serial.print("Left turn signal: ");
+        Serial.println(state.leftTurn ? "ON" : "OFF");
+        Serial.print("Left turn signal active: ");
+        Serial.println(state.leftTurnOn ? "YES" : "NO");
+        Serial.print("Hazards: ");
       break;
-    case REVERSE:
-      Serial.println("REVERSE");
-      break;
-    case REGEN:
-      Serial.println("REGEN");
-      break;
-    case NEUTRAL:
-      Serial.println("NEUTRAL");
-      break;
+      ////////////////////
+      case 2: 
+        //Serial.print("Cruise control: ");
+        //Serial.println(state.cruiseCtrl ? "ON" : "OFF");
+        //Serial.print("Cruise control previous: ");
+        //Serial.println(state.cruiseCtrlPrev ? "ON" : "OFF");
+        //Serial.print("Cruise control active: ");
+        //Serial.println(state.cruiseCtrlOn ? "YES" : "NO");
+        //Serial.print("Cruise control ratio: ");
+        //Serial.println(state.cruiseCtrlRatio);
+        Serial.print("CAN error: ");
+        Serial.println(canControl.errors, HEX);
+        Serial.print("TEC/REC: ");
+        Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+        Serial.print("Board error: ");
+        Serial.println(state.dcErrorFlags, HEX);
+     break;
     }
-    Serial.print("Ignition: ");
-    Serial.println(state.ignition,HEX);
-    Serial.print("Horn: ");
-    Serial.println(state.horn ? "ON" : "OFF");
-    Serial.print("Headlights: ");
-    Serial.println(state.headlights ? "ON" : "OFF");
-    Serial.print("Brakelights: ");
-    Serial.println(state.brakeEngaged ? "ON" : "OFF");
-    Serial.print("Right turn signal: ");
-    Serial.println(state.rightTurn ? "ON" : "OFF");
-    Serial.print("Right turn singal active: ");
-    Serial.println(state.rightTurnOn ? "YES" : "NO");
-    Serial.print("Left turn signal: ");
-    Serial.println(state.leftTurn ? "ON" : "OFF");
-    Serial.print("Left turn signal active: ");
-    Serial.println(state.leftTurnOn ? "YES" : "NO");
-    Serial.print("Hazards: ");
-    Serial.println(state.hazards ? "ON" : "OFF");
-    //Serial.print("Cruise control: ");
-    //Serial.println(state.cruiseCtrl ? "ON" : "OFF");
-    //Serial.print("Cruise control previous: ");
-    //Serial.println(state.cruiseCtrlPrev ? "ON" : "OFF");
-    //Serial.print("Cruise control active: ");
-    //Serial.println(state.cruiseCtrlOn ? "YES" : "NO");
-    //Serial.print("Cruise control ratio: ");
-    //Serial.println(state.cruiseCtrlRatio);
-    Serial.print("CAN error: ");
-    Serial.println(state.canErrorFlags, HEX);
-    Serial.print("Board error: ");
-    Serial.println(state.dcErrorFlags, HEX);
+    
     Serial.print("System time: ");
     Serial.println(millis());
     Serial.println();
     
+    debugStep = (debugStep+1) % 3;
     debugEndTime = millis();
-    */
     debugTimer.reset();
   }
   
