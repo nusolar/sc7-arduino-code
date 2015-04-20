@@ -51,7 +51,7 @@ const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;  // interval for debug calls output
-const uint16_t SERIAL_BAUD       = 115200; // baudrate for serial (maximum)
+const int      SERIAL_BAUD       = 115200; // baudrate for serial (maximum)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -673,4 +673,5 @@ void loop() {
   
   state.canErrorFlags = 0;
 }
+
 
