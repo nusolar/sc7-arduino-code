@@ -642,6 +642,7 @@ void loop() {
         Serial.print("Left turn signal active: ");
         Serial.println(state.leftTurnOn ? "YES" : "NO");
         Serial.print("Hazards: ");
+        Serial.println(state.hazards ? "YES" : "NO");
       break;
       ////////////////////
       case 2: 
