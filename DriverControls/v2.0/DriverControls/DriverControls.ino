@@ -520,7 +520,7 @@ void setup() {
   CANFilterOpt filters;
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, &state.canErrorFlags);
+  canControl.Setup(filters);
 
   // init car state
   state = {}; // init all members to 0
