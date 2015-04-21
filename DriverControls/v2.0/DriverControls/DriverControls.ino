@@ -32,21 +32,23 @@ const byte BOARDLED       = 13;
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
 const byte     FREQ      = 16;
+
 const uint16_t RXM0      = MASK_Sx00;
+const uint16_t RXF0      = SW_HEARTBEAT_ID; // Match any steering_wheel packet (because mask is Sx00)
+const uint16_t RXF1      = 0;
+
 const uint16_t RXM1      = MASK_Sxxx;
-const uint16_t RXF0      = SW_HEARTBEAT_ID;
-const uint16_t RXF1      = BMS_VOLT_CURR_ID;
-const uint16_t RXF2      = MC_VELOCITY_ID;
-const uint16_t RXF3      = BMS_HEARTBEAT_ID;
-const uint16_t RXF4      = MASK_NONE;
-const uint16_t RXF5      = MASK_NONE;
+const uint16_t RXF2      = BMS_VOLT_CURR_IDMC_VELOCITY_ID;
+const uint16_t RXF3      = 0;
+const uint16_t RXF4      = MC_VELOCITY_ID;
+const uint16_t RXF5      = 0;
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
 const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 50;    // drive command packet
-const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
+const uint16_t DC_INFO_INTERVAL  = 80;   // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
@@ -86,7 +88,7 @@ const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
 /*
  * Enum to represet the possible gear states.
  */
-enum GearState { BRAKE, FORWARD, REVERSE, REGEN, NEUTRAL };
+enum GearState { BRAKE = 0x04, FORWARD = 0x08, REVERSE = 0x01, REGEN = 0x0C, NEUTRAL = 0x02 }; //3 bytes (bit values try to match tritium bit positions in the switches bit (see can.h)
 
 /*
  * Enum to represent ignition states
@@ -455,7 +457,7 @@ void writeCAN() {
     delay(10);
 
     // Send BMS Ignition Packet
-    canControl.Send(DC_SwitchPos(state.ignition),TXB2);
+    //canControl.Send(DC_SwitchPos(state.ignition),TXB2);
     
     // reset timer
     dcDriveTimer.reset();
@@ -482,7 +484,9 @@ void writeCAN() {
   if (dcInfoTimer.check()) {
     // create and send packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
-                            state.canErrorFlags, state.dcErrorFlags, state.wasReset,state.gear), TXB0);
+                            state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
+                            ((state.ignition == 0x0040) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
+                            state.gear, state.ignition), TXB0);
     
     // reset timer
     dcInfoTimer.reset();
@@ -658,6 +662,10 @@ void loop() {
         Serial.println(canControl.errors, HEX);
         Serial.print("TEC/REC: ");
         Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+        Serial.print("Interrupt Counter: ");
+        Serial.println(canControl.int_counter);
+        Serial.print("RX buffer counter: ");
+        Serial.println(canControl.RXbuffer.size());
         Serial.print("Board error: ");
         Serial.println(state.dcErrorFlags, HEX);
      break;
