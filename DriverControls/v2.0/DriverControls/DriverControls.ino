@@ -212,11 +212,25 @@ void readInputs() {
  * Reads packets from CAN message queue and updates car state.
  */
 void readCAN() {
+  nointerrupts(); // disable interrupts while 
+
   int i = 0;
-  while(canControl.Available() && i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
+  while(i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
     i++;
 
-    Frame& f = canControl.Read(); // read one message
+    // disable interrupts while we deal with the queue, so we don't get
+    // an interrupt trying to write to our queue while we read
+    nointerrupts(); 
+
+      // If there is nothing in the queue, break (this didn't go above because I needed nointerrupts first)
+      if (!canControl.Available())
+        break;
+
+      Frame& f = canControl.Read(); // read one message
+
+    // We are done with the queue, and this next part might take a while,
+    // so we turn interrupts back on
+    interrupts();
     
     // determine source and update heartbeat timers
     // first three digits will be exactly equal to heartbeat ids
@@ -548,7 +562,7 @@ void setup() {
   CANFilterOpt filters;
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, RX0IE | RX1IE);
+  canControl.Setup(filters, RX0IE | RX1IE); // Start can with only the two receive interupts enabled (to try and eliminate the system freezing on a continuous interrupt)
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
