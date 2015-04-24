@@ -34,14 +34,14 @@ const uint16_t BAUD_RATE = 1000;
 const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sx00;
-const uint16_t RXF0      = SW_HEARTBEAT_ID; // Match any steering_wheel packet (because mask is Sx00)
+const uint16_t RXF0      = SW_BASEADDRESS; // Match any steering_wheel packet (because mask is Sx00)
 const uint16_t RXF1      = 0;
 
 const uint16_t RXM1      = MASK_Sxxx;
-const uint16_t RXF2      = BMS_VOLT_CURR_IDMC_VELOCITY_ID;
-const uint16_t RXF3      = 0;
+const uint16_t RXF2      = BMS_VOLT_CURR_ID;
+const uint16_t RXF3      = BMS_SOC_ID; // Most useless: replace first (soc not used by DC currently)
 const uint16_t RXF4      = MC_VELOCITY_ID;
-const uint16_t RXF5      = 0;
+const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
@@ -65,6 +65,7 @@ const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
 const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
 const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
+const int      MAX_CAN_PACKETS_PER_LOOP = 10;
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 
@@ -83,7 +84,7 @@ const uint16_t BMS_TIMEOUT = 0x02; // bms timed out
 const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
 const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
-
+const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
  * Enum to represet the possible gear states.
@@ -211,20 +212,23 @@ void readInputs() {
  * Reads packets from CAN message queue and updates car state.
  */
 void readCAN() {
-  while (canControl.Available()) { // there are messages
+  int i = 0;
+  while(canControl.Available() && i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
+    i++;
+
     Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
     // first three digits will be exactly equal to heartbeat ids
-    if ((f.id & MASK_Sx00) == BMS_HEARTBEAT_ID) { // source is bms
+    if ((f.id & MASK_Sx00) == BMS_BASEADDRESS) { // source is bms
       bmsHbTimer.reset();
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sx00) == MC_HEARTBEAT_ID) { // source is mc
+    else if ((f.id & MASK_Sx00) == MC_BASEADDRESS) { // source is mc
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sx00) == SW_HEARTBEAT_ID) { // source is sw
+    else if ((f.id & MASK_Sx00) == SW_BASEADDRESS) { // source is sw
       swHbTimer.reset();
       state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
     }
@@ -520,12 +524,6 @@ void setup() {
     Serial.println("Serial Initialized");
   }
   
-  // setup CAN
-  CANFilterOpt filters;
-  filters.setRB0(RXM0, RXF0, RXF1);
-  filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters);
-
   // init car state
   state = {}; // init all members to 0
   state.gear = FORWARD;
@@ -544,22 +542,29 @@ void setup() {
   dcInfoTimer.reset();
   dcHbTimer.reset();
   debugTimer.reset();
+  
+  
+  // setup CAN
+  CANFilterOpt filters;
+  filters.setRB0(RXM0, RXF0, RXF1);
+  filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
+  canControl.Setup(filters, RX0IE | RX1IE);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
   if (DEBUG) {
     Serial.print("Init CAN error: ");
-    Serial.println(state.canErrorFlags, HEX);
+    Serial.println(canControl.errors, HEX);
   }
 }
 
-void loop() {  
+void loop() {
   // clear watchdog timer
   WDT_Restart(WDT);
   
   // read GPIO
   readInputs();
-  
+    
   // read CAN
   readCAN();
   
@@ -583,6 +588,18 @@ void loop() {
   
   // clear watchdog timer
   WDT_Restart(WDT);
+
+  // Get any CAN errors that have occured
+  canControl.FetchErrors();
+  
+  // Reset the MCP if we are heading towards a bus_off condition
+  if (canControl.errors & CANERR_HIGH_ERROR_COUNT)
+  {
+    canControl.ResetController();
+    state.dcErrorFlags |= RESET_MCP2515;
+    if (DEBUG)
+      Serial.print("Reset MCP2515");
+  }
   
   // debugging
   if (DEBUG && debugTimer.check()) {
