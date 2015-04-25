@@ -122,6 +122,7 @@ struct CarState {
   
   // bms info
   float bmsPercentSOC; // percent state of charge of bms
+  float bmsCurrent; // Current reading from BMS (negative is out of the batteries)
   
   // debugging
   bool wasReset;       // true on initilization, false otherwise
@@ -212,25 +213,11 @@ void readInputs() {
  * Reads packets from CAN message queue and updates car state.
  */
 void readCAN() {
-  nointerrupts(); // disable interrupts while 
-
   int i = 0;
-  while(i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
+  while(canControl.Available() && i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
     i++;
-
-    // disable interrupts while we deal with the queue, so we don't get
-    // an interrupt trying to write to our queue while we read
-    nointerrupts(); 
-
-      // If there is nothing in the queue, break (this didn't go above because I needed nointerrupts first)
-      if (!canControl.Available())
-        break;
-
-      Frame& f = canControl.Read(); // read one message
-
-    // We are done with the queue, and this next part might take a while,
-    // so we turn interrupts back on
-    interrupts();
+    noInterrupts();
+    Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
     // first three digits will be exactly equal to heartbeat ids
@@ -278,13 +265,16 @@ void readCAN() {
     }
     else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
     	BMS_VoltageCurrent packet(f);
+      state.bmsCurrent = packet.current;
 
-    	if (packet.current >= TRIP_CURRENT_THRESH) {
+    	if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH) {
     		state.ignition = Ignition_Park; // KILL THE BATTERIES
     		state.dcErrorFlags |= BMS_OVER_CURR;
     	}
     }
+    interrupts();
   }
+  interrupts();
 }
 
 /*
@@ -543,7 +533,7 @@ void setup() {
   state.gear = FORWARD;
   state.gearRaw = FORWARD_RAW;
   state.wasReset = true;
-  state.ignition = Ignition_Run;
+  state.ignition = Ignition_Park;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -562,7 +552,7 @@ void setup() {
   CANFilterOpt filters;
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, RX0IE | RX1IE); // Start can with only the two receive interupts enabled (to try and eliminate the system freezing on a continuous interrupt)
+  canControl.Setup(filters, RX0IE | RX1IE);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
@@ -603,16 +593,20 @@ void loop() {
   // clear watchdog timer
   WDT_Restart(WDT);
 
-  // Get any CAN errors that have occured
+  //Check the can bus for errors
   canControl.FetchErrors();
   
   // Reset the MCP if we are heading towards a bus_off condition
-  if (canControl.errors & CANERR_HIGH_ERROR_COUNT)
+  if (canControl.tec > 135 || canControl.rec > 135)
   {
-    canControl.ResetController();
-    state.dcErrorFlags |= RESET_MCP2515;
     if (DEBUG)
-      Serial.print("Reset MCP2515");
+      Serial.println("Reseting MCP2515");
+    canControl.ResetController();
+    if (DEBUG)
+      Serial.println("Reset MCP2515");
+
+    state.dcErrorFlags |= RESET_MCP2515;
+
   }
   
   // debugging
@@ -699,6 +693,8 @@ void loop() {
         Serial.println(canControl.RXbuffer.size());
         Serial.print("Board error: ");
         Serial.println(state.dcErrorFlags, HEX);
+        Serial.print("BMS Current: ");
+        Serial.println(state.bmsCurrent);
      break;
     }
     
