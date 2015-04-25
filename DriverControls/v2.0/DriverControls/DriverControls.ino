@@ -76,7 +76,7 @@ const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
 
 // BMS parameters
-const float TRIP_CURRENT_THRESH		= 5000;
+const float TRIP_CURRENT_THRESH		= 50000; //mA
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -118,7 +118,7 @@ struct CarState {
   // motor info
   float motorVelocity;  // rotational speed of motor (rpm)
   float carVelocity;    // velocity of car (mph)
-  float busCurrent;
+  int16_t busCurrent;
   
   // bms info
   float bmsPercentSOC; // percent state of charge of bms
@@ -493,7 +493,7 @@ void writeCAN() {
     // create and send packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
-                            ((state.ignition == 0x0040) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
+                            ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
                             state.gear, state.ignition), TXB0);
     
     // reset timer
@@ -597,7 +597,7 @@ void loop() {
   canControl.FetchErrors();
   
   // Reset the MCP if we are heading towards a bus_off condition
-  if (canControl.tec > 135 || canControl.rec > 135)
+  if (canControl.tec > 200 || canControl.rec > 200)
   {
     if (DEBUG)
       Serial.println("Reseting MCP2515");
