@@ -66,6 +66,7 @@ const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
 const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
 const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
 const int      MAX_CAN_PACKETS_PER_LOOP = 10;
+const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 
@@ -190,7 +191,9 @@ void readInputs() {
   
   // read accel and regen pedals pedal
   state.accelRaw = analogRead(ACCEL_PIN);
-  state.regenRaw = analogRead(REGEN_PIN);
+  if (ENABLE_REGEN) { // will stay 0 if disabled
+    state.regenRaw = analogRead(REGEN_PIN);
+  }
 
   /*
   // read ignition key here
