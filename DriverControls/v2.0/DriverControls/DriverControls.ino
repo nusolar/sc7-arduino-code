@@ -16,7 +16,7 @@ const bool DEBUG = true; // change to true to output debug info over serial
 byte       debugStep = 0; // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 
 // pins
-const byte IGNITION_PIN   = 53;
+const byte IGNITION_PIN   = 49;
 const byte BRAKE_PIN      = 9;
 const byte ACCEL_PIN      = A0;
 const byte REGEN_PIN      = A1;
@@ -202,13 +202,9 @@ void readInputs() {
   else
      state.ignition = Ignition_Run;
   */
-     
-  if (digitalRead(49) == LOW)
-    state.ignition = Ignition_Start;
-  if (digitalRead(50) == LOW)
-    state.ignition = Ignition_Run;
-  if (digitalRead(51) == LOW)
-    state.ignition = Ignition_Park;
+  
+  // read ignition switch
+  state.ignition = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
 
 }
 
@@ -518,11 +514,7 @@ void setup() {
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
-  
-  pinMode(49, INPUT_PULLUP);
-  pinMode(50, INPUT_PULLUP);
-  pinMode(51, INPUT_PULLUP);
-  
+
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
   // debugging [ For some reason the board doesn't work unless I do this here instead of at the bottom ]
