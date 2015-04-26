@@ -212,10 +212,10 @@ void readInputs() {
  * Reads packets from CAN message queue and updates car state.
  */
 void readCAN() {
-  int i = 0;
-  while(canControl.Available() && i <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
-    i++;
-    noInterrupts();
+  int safetyCount = 0;
+  while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
+    safetyCount++;                // Increment safety counter
+    noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
     Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
@@ -271,9 +271,8 @@ void readCAN() {
     		state.dcErrorFlags |= BMS_OVER_CURR;
     	}
     }
-    interrupts();
+    interrupts(); \\ Enable interrupts at the end of each loop, to give new messages a chance to arrive.
   }
-  interrupts();
 }
 
 /*
