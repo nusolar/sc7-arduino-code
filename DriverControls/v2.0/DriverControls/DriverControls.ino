@@ -31,7 +31,7 @@ const byte BOARDLED       = 13;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
-const byte     FREQ      = 16;
+const byte     FREQ      = 8;
 
 const uint16_t RXM0      = MASK_Sx00;
 const uint16_t RXF0      = SW_BASEADDRESS; // Match any steering_wheel packet (because mask is Sx00)
@@ -271,7 +271,7 @@ void readCAN() {
     		state.dcErrorFlags |= BMS_OVER_CURR;
     	}
     }
-    interrupts(); \\ Enable interrupts at the end of each loop, to give new messages a chance to arrive.
+    interrupts(); // Enable interrupts at the end of each loop, to give new messages a chance to arrive.
   }
 }
 
