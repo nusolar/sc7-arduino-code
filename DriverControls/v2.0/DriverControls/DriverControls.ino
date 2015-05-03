@@ -28,6 +28,8 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
+const byte NEUTRAL_PIN    = 45;
+const byte REVERSE_PIN    = 47;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -50,6 +52,7 @@ const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 50;    // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 80;   // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
+const uint16_t DC_POWER_INTERVAL = 1000; // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;  // interval for debug calls output
@@ -176,6 +179,7 @@ Metro hazardsTimer(TOGGLE_INTERVAL);   // timer for toggling hazards
 Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
+Metro dcPowerTimer(DC_POWER_INTERVAL);
 
 // debugging
 int debugStartTime = 0;
@@ -205,6 +209,19 @@ void readInputs() {
   
   // read ignition switch
   state.ignition = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
+  
+  // read gear
+  bool rear_on = digitalRead(REVERSE_PIN) == LOW;
+  bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
+  if (neutral_on) {
+    state.gearRaw = NEUTRAL_RAW;
+  }
+  else if (rear_on) {
+    state.gearRaw = REVERSE_RAW;
+  }
+  else {
+    state.gearRaw = FORWARD_RAW;
+  }
 
 }
 
@@ -251,7 +268,7 @@ void readCAN() {
       SW_Data packet(f);
       
       // read data
-      state.gearRaw = packet.gear;
+      //state.gearRaw = packet.gear;
       state.horn = (packet.horn == SW_ON_BIT);
       state.rightTurn = (packet.rts == SW_ON_BIT);
       state.leftTurn = (packet.lts == SW_ON_BIT);
@@ -500,6 +517,13 @@ void writeCAN() {
     state.wasReset = false; // clear reset    
     delay(10); // mcp2515 seems to require small delay
   }
+  
+  if (dcPowerTimer.check()) {
+    canControl.Send(DC_Power(0.5), TXB2);
+    
+    dcPowerTimer.reset();
+    delay(10);
+  }
 }
 
 //--------------------------MAIN FUNCTIONS---------------------------//
@@ -513,6 +537,8 @@ void setup() {
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
+  pinMode(NEUTRAL_PIN, INPUT_PULLUP);
+  pinMode(REVERSE_PIN, INPUT_PULLUP);
 
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
