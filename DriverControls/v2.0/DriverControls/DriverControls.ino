@@ -231,6 +231,10 @@ void readInputs() {
 void readCAN() {
   int safetyCount = 0;
   while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
+    /************************** DEBUG CODE (REMOVE LATER) ***********************/
+    Serial.print("ReadBuffer: ");
+    Serial.println(canControl.RXbuffer.size());
+    /**************************************************************************/
     safetyCount++;                // Increment safety counter
     noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
     Frame& f = canControl.Read(); // read one message
@@ -628,10 +632,35 @@ void loop() {
     state.dcErrorFlags |= RESET_MCP2515;
 
   }
-  
+
   // debugging
   if (DEBUG && debugTimer.check()) {
     debugStartTime = millis();
+      /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
+      byte cnf2_spi_read = 0; cnf2_spi_read = canControl.controller.Read(CNF2);
+      byte Rxstatus[3] = {0,0,0};
+      Rxstatus[0] = canControl.controller.Read(TXB0CTRL);
+      Rxstatus[1] = canControl.controller.Read(TXB1CTRL);
+      Rxstatus[2] = canControl.controller.Read(TXB2CTRL);
+      byte canintf = 0; canintf = canControl.last_interrupt;
+      byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
+      byte canstat = 0; canstat = canControl.controller.Read(CANSTAT);
+      
+      Serial.print("CNF2: ");
+      Serial.println(cnf2_spi_read,BIN);
+      Serial.println("TXnCTRL: ");
+      Serial.println(Rxstatus[0], BIN);
+      Serial.println(Rxstatus[1], BIN);
+      Serial.println(Rxstatus[2], BIN);
+      Serial.print("Last Interrupt: ");
+      Serial.println(canintf, BIN);
+      Serial.print("CANCTRL: ");
+      Serial.println(canctrl, BIN);
+      Serial.print("CANSTAT: ");
+      Serial.println(canstat, BIN);
+      Serial.println("");
+      /***************************************************************************/
+    
     Serial.print("Loop time: ");
     Serial.println(debugStartTime - debugEndTime);
     Serial.print("System time: ");
