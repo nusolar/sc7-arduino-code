@@ -130,6 +130,7 @@ struct CarState {
   
   // debugging
   bool wasReset;       // true on initilization, false otherwise
+  byte canstat_reg;    // holds value of canstat register on the MCP2515
   
   // DERIVED DATA
   // pedals
@@ -322,7 +323,11 @@ void checkTimers() {
  * If errors exist, updates the error state.
  */
 void checkErrors() {
-  // nothing to do for now
+  // Kill BMS if we detected an overcurrent condition on the BMS
+  if (state.dcErrorFlags & BMS_OVER_CURR)
+  {
+    state.ignition = Ignition_Park;
+  }
 }
 
 /*
@@ -452,7 +457,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check() || state.dcErrorFlags & BMS_OVER_CURR ) { // ready to send drive command
+  if (dcDriveTimer.check() && !(state.dcErrorFlags & BMS_OVER_CURR)) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -482,15 +487,9 @@ void writeCAN() {
     canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXB0);
 
     delay(10);
-
-    // Send BMS Ignition Packet
-    //canControl.Send(DC_SwitchPos(state.ignition),TXB2);
     
     // reset timer
     dcDriveTimer.reset();
-    
-    // reset any BMS error that occured which caused us to send this packet immediately.
-    state.dcErrorFlags &= ~BMS_OVER_CURR;
        
     delay(10); // mcp2515 seems to require small delay
 
@@ -625,12 +624,32 @@ void loop() {
   {
     if (DEBUG)
       Serial.println("Reseting MCP2515");
+      Serial.print("TEC/REC: ");
+      Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
     canControl.ResetController();
     if (DEBUG)
       Serial.println("Reset MCP2515");
 
     state.dcErrorFlags |= RESET_MCP2515;
-
+  }
+  
+  // Check the mode of the MCP2515 (sometimes it is going to sleep randomly)
+  state.canstat_reg = canControl.controller.Read(CANSTAT);
+  if (state.canstat_reg == 0b00100000)
+  {
+    /*canControl.controller.Write(CANCTRL,0x07);
+    // Clear all pending transmissions so that we can change modes.
+    canControl.controller.BitModify(TXB0CTRL,0x08,0x00);
+    canControl.controller.BitModify(TXB1CTRL,0x08,0x00);
+    canControl.controller.BitModify(TXB2CTRL,0x08,0x00);
+    delay(10);*/
+    canControl.ResetController();
+    state.canstat_reg = canControl.controller.Read(CANSTAT);
+    if (DEBUG)
+    {
+       Serial.print("MCP2515 went to sleep. CANSTAT reset to: ");
+       Serial.println(state.canstat_reg);
+    }
   }
 
   // debugging
@@ -644,7 +663,6 @@ void loop() {
       Rxstatus[2] = canControl.controller.Read(TXB2CTRL);
       byte canintf = 0; canintf = canControl.last_interrupt;
       byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
-      byte canstat = 0; canstat = canControl.controller.Read(CANSTAT);
       
       Serial.print("CNF2: ");
       Serial.println(cnf2_spi_read,BIN);
@@ -657,7 +675,7 @@ void loop() {
       Serial.print("CANCTRL: ");
       Serial.println(canctrl, BIN);
       Serial.print("CANSTAT: ");
-      Serial.println(canstat, BIN);
+      Serial.println(state.canstat_reg, BIN);
       Serial.println("");
       /***************************************************************************/
     
