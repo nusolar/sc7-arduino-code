@@ -182,9 +182,11 @@ Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 
-// debugging
-int debugStartTime = 0;
-int debugEndTime = 0;
+// Timing debugging variables.
+long loopStartTime = 0;
+long loopSumTime = 0;
+int loopCount = 0;
+
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -199,14 +201,6 @@ void readInputs() {
   if (ENABLE_REGEN) { // will stay 0 if disabled
     state.regenRaw = analogRead(REGEN_PIN);
   }
-
-  /*
-  // read ignition key here
-  if (digitalRead(IGNITION_PIN) == LOW)
-     state.ignition = Ignition_Start;
-  else
-     state.ignition = Ignition_Run;
-  */
   
   // read ignition switch
   state.ignition = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
@@ -586,6 +580,12 @@ void setup() {
 }
 
 void loop() {
+  // Start timer
+  if (DEBUG)
+  {
+    loopStartTime = millis();
+  }
+  
   // clear watchdog timer
   WDT_Restart(WDT);
   
@@ -655,10 +655,17 @@ void loop() {
        Serial.println(canControl.canstat_register);
     }
   }
-
-  // debugging
+  
+  // Add the loop time to the sum time
+  if (DEBUG)
+  { 
+    loopSumTime += millis() - loopStartTime;
+    loopCount += 1;
+  }
+  
+  // debugging printout
   if (DEBUG && debugTimer.check()) {
-    debugStartTime = millis();
+      
       /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
       byte cnf2_spi_read = 0; cnf2_spi_read = canControl.controller.Read(CNF2);
       byte Txstatus[3] = {0,0,0};
@@ -683,8 +690,8 @@ void loop() {
       Serial.println("");
       /***************************************************************************/
     
-    Serial.print("Loop time: ");
-    Serial.println(debugStartTime - debugEndTime);
+    Serial.print("Average Loop time: ");
+    Serial.println(loopSumTime / loopCount);
     Serial.print("System time: ");
     Serial.println(millis());
     switch (debugStep)
@@ -774,10 +781,13 @@ void loop() {
     Serial.println();
     
     debugStep = (debugStep+1) % 3;
-    debugEndTime = millis();
     debugTimer.reset();
+    
+    // Reset loop timer variables
+    loopSumTime = 0;
+    loopCount = 0;
   }
-  
+  // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
 
