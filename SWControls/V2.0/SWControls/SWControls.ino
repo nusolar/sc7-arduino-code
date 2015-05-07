@@ -6,7 +6,7 @@
 #include <SPI.h>
 
 //#define LOOPBACK
-//#define DEBUG
+#define DEBUG
 
 /*Defining the bitwise functions (bitwise operators)
 We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
@@ -81,7 +81,6 @@ const uint16_t RXF2      = MASK_NONE;
 const uint16_t RXF3      = MASK_NONE;
 const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
-uint16_t CAN_errors;
 
 CAN_IO CanControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
 
@@ -130,7 +129,7 @@ void setup() {
   pinMode(rtp, INPUT_PULLUP);
 
   //set Serial and screen baud rate to 9600bps
-  Serial.begin(9600);
+  Serial.begin(115200);
   screen.begin();
   delay(500); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
@@ -150,7 +149,7 @@ void setup() {
   CANFilterOpt filter;
   filter.setRB0(MASK_Sxxx,BMS_SOC_ID,MC_VELOCITY_ID); 
   filter.setRB1(MASK_Sxxx,0,0,0,0);
-  CanControl.Setup(filter, &CAN_errors, RX0IE|RX1IE|ERRIE);
+  CanControl.Setup(filter, RX0IE|RX1IE);
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
   CanControl.controller.Mode(MODE_LOOPBACK); 
@@ -161,10 +160,6 @@ void setup() {
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
-  
-#ifdef DEBUG
-  Serial.print("It works up to here");
-#endif
 }
 
 //assigns appropriate value to the bit from the state of the pin
