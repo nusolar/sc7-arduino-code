@@ -623,19 +623,23 @@ void loop() {
   if (canControl.tec > 200 || canControl.rec > 200)
   {
     if (DEBUG)
+    {
       Serial.println("Reseting MCP2515");
       Serial.print("TEC/REC: ");
       Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+    }
     canControl.ResetController();
     if (DEBUG)
+    {
       Serial.println("Reset MCP2515");
+    }
 
     state.dcErrorFlags |= RESET_MCP2515;
   }
   
   // Check the mode of the MCP2515 (sometimes it is going to sleep randomly)
-  state.canstat_reg = canControl.controller.Read(CANSTAT);
-  if (state.canstat_reg == 0b00100000)
+  canControl.FetchStatus();
+  if ((canControl.canstat_register & 0b00100000) == 0b00100000)
   {
     /*canControl.controller.Write(CANCTRL,0x07);
     // Clear all pending transmissions so that we can change modes.
@@ -644,11 +648,11 @@ void loop() {
     canControl.controller.BitModify(TXB2CTRL,0x08,0x00);
     delay(10);*/
     canControl.ResetController();
-    state.canstat_reg = canControl.controller.Read(CANSTAT);
+    canControl.FetchStatus(); // check that everything worked
     if (DEBUG)
     {
        Serial.print("MCP2515 went to sleep. CANSTAT reset to: ");
-       Serial.println(state.canstat_reg);
+       Serial.println(canControl.canstat_register);
     }
   }
 
@@ -657,19 +661,19 @@ void loop() {
     debugStartTime = millis();
       /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
       byte cnf2_spi_read = 0; cnf2_spi_read = canControl.controller.Read(CNF2);
-      byte Rxstatus[3] = {0,0,0};
-      Rxstatus[0] = canControl.controller.Read(TXB0CTRL);
-      Rxstatus[1] = canControl.controller.Read(TXB1CTRL);
-      Rxstatus[2] = canControl.controller.Read(TXB2CTRL);
+      byte Txstatus[3] = {0,0,0};
+      Txstatus[0] = canControl.controller.Read(TXB0CTRL);
+      Txstatus[1] = canControl.controller.Read(TXB1CTRL);
+      Txstatus[2] = canControl.controller.Read(TXB2CTRL);
       byte canintf = 0; canintf = canControl.last_interrupt;
       byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
       
       Serial.print("CNF2: ");
       Serial.println(cnf2_spi_read,BIN);
       Serial.println("TXnCTRL: ");
-      Serial.println(Rxstatus[0], BIN);
-      Serial.println(Rxstatus[1], BIN);
-      Serial.println(Rxstatus[2], BIN);
+      Serial.println(Txstatus[0], BIN);
+      Serial.println(Txstatus[1], BIN);
+      Serial.println(Txstatus[2], BIN);
       Serial.print("Last Interrupt: ");
       Serial.println(canintf, BIN);
       Serial.print("CANCTRL: ");
