@@ -45,14 +45,14 @@ const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
 
 //set up pins that connect to switch terminals
-const int fgp =   9;  //forward gear
-const int rgp =   8;  //reverse gear
-const int hp =    7;  //headlights
-const int hzp =   6;  //hazardlights
-const int ccp =   3;  //cruise control
-const int hornp = 10; //horn
-const int ltp =   4;  //left turn
-const int rtp =   5;  //right turn
+const int fgp =   6;  //forward gear
+const int rgp =   7;  //reverse gear
+const int hp =    9;  //headlights
+const int hzp =   8;  //hazardlights
+const int ccp =   4;  //cruise control
+const int hornp = 5; //horn
+const int ltp =   3;  //left turn
+const int rtp =   A2;  //right turn
 
 //set up metro timer
 //1st: switch state reading timer - frequency at which switches are read
@@ -69,8 +69,8 @@ Metro display_timer = Metro(500);
 Metro blinking_timer = Metro(500);
 
 //CAN parameters
-const byte	   CAN_CS 	 = A0;
-const byte	   CAN_INT	 = 1;
+const byte	   CAN_CS 	 = 10;
+const byte	   CAN_INT	 = 1; // Not the pin number, the interrupt number (https://learn.sparkfun.com/tutorials/pro-micro--fio-v3-hookup-guide/hardware-overview-pro-micro)
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
 const uint16_t RXM0      = MASK_NONE;
@@ -424,6 +424,7 @@ inline void initializePins()
     steering_wheel.Lightsdisplay = "  ";
   }
 }
+
 
 
 
