@@ -5,7 +5,7 @@
 #include <avr/wdt.h>
 #include <SPI.h>
 
-//#define LOOPBACK
+#define LOOPBACK
 #define DEBUG
 
 /*Defining the bitwise functions (bitwise operators)
@@ -45,14 +45,14 @@ const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
 
 //set up pins that connect to switch terminals
-const int fgp =   9;  //forward gear
-const int rgp =   8;  //reverse gear
-const int hp =    7;  //headlights
-const int hzp =   6;  //hazardlights
-const int ccp =   3;  //cruise control
-const int hornp = 10; //horn
-const int ltp =   4;  //left turn
-const int rtp =   5;  //right turn
+const int fgp =   6;  //forward gear
+const int rgp =   7;  //reverse gear
+const int hp =    9;  //headlights
+const int hzp =   8;  //hazardlights
+const int ccp =   4;  //cruise control
+const int hornp = 5; //horn
+const int ltp =   3;  //left turn
+const int rtp =   A2;  //right turn
 
 //set up metro timer
 //1st: switch state reading timer - frequency at which switches are read
@@ -69,8 +69,8 @@ Metro display_timer = Metro(500);
 Metro blinking_timer = Metro(500);
 
 //CAN parameters
-const byte	   CAN_CS 	 = A0;
-const byte	   CAN_INT	 = 1;
+const byte     CAN_CS 	 = 10;
+const byte     CAN_INT	 = 1;
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
 const uint16_t RXM0      = MASK_NONE;
@@ -81,6 +81,7 @@ const uint16_t RXF2      = MASK_NONE;
 const uint16_t RXF3      = MASK_NONE;
 const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
+uint16_t errors;
 
 CAN_IO CanControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
 
@@ -129,9 +130,9 @@ void setup() {
   pinMode(rtp, INPUT_PULLUP);
 
   //set Serial and screen baud rate to 9600bps
-  Serial.begin(115200);
+  Serial.begin(9600);
   screen.begin();
-  delay(500); // Allow MCP2515 to run for 128 cycles and LCD to boot
+  delay(1000); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
@@ -148,8 +149,8 @@ void setup() {
    */
   CANFilterOpt filter;
   filter.setRB0(MASK_Sxxx,BMS_SOC_ID,MC_VELOCITY_ID); 
-  filter.setRB1(MASK_Sxxx,0,0,0,0);
-  CanControl.Setup(filter, RX0IE|RX1IE);
+  filter.setRB1(MASK_NONE,0,0,0,0);
+  CanControl.Setup(filter,&errors, RX0IE|RX1IE);
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
   CanControl.controller.Mode(MODE_LOOPBACK); 
@@ -242,7 +243,7 @@ inline void displayNotification(){
 void loop() {  
   wdt_reset();
   old = young;
-
+  
   /*if the metro timer runs out, then check the states of all the switches
    assign the values to the 'young' byte. Reset switch timer.*/
   if (switch_timer.check()){
@@ -267,6 +268,7 @@ void loop() {
 #ifdef DEBUG
     Serial.print("Display:");
     Serial.println(display_timer.previous_millis); //ask alexander
+    Serial.print(CanControl.controller.Read(CANCTRL));
 #endif
 
     //possibility of switch statements?
@@ -373,6 +375,9 @@ void loop() {
         CAN_RX.reset();
         break;
       }
+      case SW_DATA_ID:
+        Serial.print("CAN RECEIVED");
+        break;
     }
   }
   // else if (CAN_RX.check()){
@@ -424,6 +429,7 @@ inline void initializePins()
     steering_wheel.Lightsdisplay = "  ";
   }
 }
+
 
 
 
