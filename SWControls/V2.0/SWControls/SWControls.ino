@@ -5,7 +5,7 @@
 #include <avr/wdt.h>
 #include <SPI.h>
 
-#define LOOPBACK
+//#define LOOPBACK
 #define DEBUG
 
 /*Defining the bitwise functions (bitwise operators)
@@ -67,6 +67,8 @@ Metro notif_timer = Metro(1000);
 Metro display_timer = Metro(500);
 //6th: Turn signal blinking timer
 Metro blinking_timer = Metro(500);
+//7th: Debug Timer
+Metro debug_timer = Metro(200);
 
 //CAN parameters
 const byte     CAN_CS 	 = 10;
@@ -132,13 +134,13 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
-  delay(1000); // Allow MCP2515 to run for 128 cycles and LCD to boot
+  delay(500); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
    * PROGRAMMING BY SETTING HAZARD/HEADLIGHT SWITCH TO
    * THE HAZARDS POSITION.
-   */  checkProgrammingMode();
+   */ checkProgrammingMode();
 
   // Initialize the pin states
   initializePins();
@@ -150,7 +152,7 @@ void setup() {
   CANFilterOpt filter;
   filter.setRB0(MASK_Sxxx,BMS_SOC_ID,MC_VELOCITY_ID); 
   filter.setRB1(MASK_NONE,0,0,0,0);
-  CanControl.Setup(filter,&errors, RX0IE|RX1IE);
+  CanControl.Setup(filter, RX0IE|RX1IE);
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
   CanControl.controller.Mode(MODE_LOOPBACK); 
@@ -265,11 +267,6 @@ void loop() {
   }
 
   if (old != young || display_timer.check()){
-#ifdef DEBUG
-    Serial.print("Display:");
-    Serial.println(display_timer.previous_millis); //ask alexander
-    Serial.print(CanControl.controller.Read(CANCTRL));
-#endif
 
     //possibility of switch statements?
     //Switch turnsignal_on on and off at regular intervals
@@ -345,10 +342,6 @@ void loop() {
   //If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packet and reset CAN_TX timer.
   if(young != old || CAN_TX.check()){
     CanControl.Send(SW_Data(young),TXB0);
-#ifdef DEBUG
-    Serial.print("Switches:");
-    Serial.println(young,BIN);
-#endif
     CAN_TX.reset();
   }
 
@@ -384,6 +377,22 @@ void loop() {
   // 	notif_timer().reset();
   // 	steering_wheel.notification = "Comm. lost with Driver Controls!"
   // } I guess we'll implement this later, since it hasn't been checked. 
+  
+  //Debug for CAN
+  CanControl.FetchErrors();
+  CanControl.FetchStatus();
+  
+  #ifdef DEBUG
+    if (debug_timer.check())
+    {
+      Serial.print("Switches:");
+      Serial.println(young,BIN);
+      Serial.print("TEC/REC: ");
+      Serial.print(CanControl.tec); Serial.print(", "); Serial.println(CanControl.rec);
+      Serial.print("CANSTATUS: ");
+      Serial.println(CanControl.canstat_register);
+    }
+  #endif
 }
 
 /*
