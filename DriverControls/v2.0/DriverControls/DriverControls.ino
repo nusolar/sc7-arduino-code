@@ -81,6 +81,9 @@ const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel
 
 // BMS parameters
 const float TRIP_CURRENT_THRESH		= 50000; //mA
+const float MAX_OVERCURRENT_RATIO       = 1.2f;  // current may exceed trip threshold by this multiplier
+const int   CURRENT_BUFFER_SIZE         = 5;     // number of current values from BMS stored
+const int   OVERCURRENTS_ALLOWED        = 2;     // max number of overcurrent values allowed before trip
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -125,8 +128,14 @@ struct CarState {
   int16_t busCurrent;
   
   // bms info
-  float bmsPercentSOC; // percent state of charge of bms
-  float bmsCurrent; // Current reading from BMS (negative is out of the batteries)
+  float bmsPercentSOC;                      // percent state of charge of bms
+  float bmsCurrent;                         // Current reading from BMS (negative is out of the batteries)
+  int currentBufferIndex;                   // points to index of next value to be written
+  float currentBuffer[CURRENT_BUFFER_SIZE]; // buffer to hold most recent current values from BMS
+  int numOvercurrents;                      // number of current values in buffer over threshold
+  
+  // ignition
+  IgnitionState ignitionRaw;                // ingition requested by ignition switch
   
   // debugging
   bool wasReset;       // true on initilization, false otherwise
@@ -151,11 +160,11 @@ struct CarState {
   // gearing and ignition
   GearState gear;               // brake, foward, reverse, regen, neutral
   IgnitionState ignition;	// start, run, park
+  bool tripped;                 // flag for overcurrent  
   
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
-
 
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
@@ -203,7 +212,7 @@ void readInputs() {
   }
   
   // read ignition switch
-  state.ignition = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
+  state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
   
   // read gear
   bool rear_on = digitalRead(REVERSE_PIN) == LOW;
@@ -279,13 +288,8 @@ void readCAN() {
       //state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
     }
     else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
-    	BMS_VoltageCurrent packet(f);
+      BMS_VoltageCurrent packet(f);
       state.bmsCurrent = packet.current;
-
-    	if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH) {
-    		state.ignition = Ignition_Park; // KILL THE BATTERIES
-    		state.dcErrorFlags |= BMS_OVER_CURR;
-    	}
     }
     interrupts(); // Enable interrupts at the end of each loop, to give new messages a chance to arrive.
   }
@@ -317,11 +321,6 @@ void checkTimers() {
  * If errors exist, updates the error state.
  */
 void checkErrors() {
-  // Kill BMS if we detected an overcurrent condition on the BMS
-  if (state.dcErrorFlags & BMS_OVER_CURR)
-  {
-    state.ignition = Ignition_Park;
-  }
 }
 
 /*
@@ -432,6 +431,32 @@ void updateState() {
   //                       0 : 
   //                       state.accelRatio;
   //}
+  
+  // check for trip
+  if (state.bmsCurrent >= TRIP_CURRENT_THRESH && 
+      state.currentBuffer[state.currentBufferIndex] < TRIP_CURRENT_THRESH) { // increment overcurrent counter
+    state.numOvercurrents++;
+  }
+  else if (state.bmsCurrent < TRIP_CURRENT_THRESH && 
+           state.currentBuffer[state.currentBufferIndex] >= TRIP_CURRENT_THRESH) { // decrement overcurrent counter
+    state.numOvercurrents--;
+  }
+  state.currentBuffer[state.currentBufferIndex] = state.bmsCurrent; // store current in buffer
+  state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
+    
+  if (state.bmsCurrent >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
+      state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
+    state.tripped = true;
+    state.dcErrorFlags |= BMS_OVER_CURR;
+  }
+  
+  // update ignition state
+  if (state.tripped) { // kill car
+    state.ignition = Ignition_Park;
+  }
+  else {
+    state.ignition = state.ignitionRaw;
+  }
 }
 
 /*
@@ -451,7 +476,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check() && !(state.dcErrorFlags & BMS_OVER_CURR)) { // ready to send drive command
+  if (dcDriveTimer.check() && !state.tripped) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -551,6 +576,10 @@ void setup() {
   state.gearRaw = FORWARD_RAW;
   state.wasReset = true;
   state.ignition = Ignition_Park;
+  for (int i = 0; i < CURRENT_BUFFER_SIZE; i++) {
+    state.currentBuffer[i] = 0;
+  }
+  state.tripped = false;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
