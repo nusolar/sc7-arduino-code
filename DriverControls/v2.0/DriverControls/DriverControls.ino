@@ -498,7 +498,7 @@ void writeCAN() {
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
     // create and send packet
-    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY;
+    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
     // reset timer
     dcHbTimer.reset(); 
@@ -576,7 +576,7 @@ void setup() {
   CANFilterOpt filters;
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, RX0IE | RX1IE | TXB0IE | TXB1IE | TXB2IE);
+  canControl.Setup(filters, RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
