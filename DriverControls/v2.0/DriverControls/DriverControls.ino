@@ -66,6 +66,7 @@ const float    MAX_REGEN_RATIO     = 1.0;     // maximum safe regen ratio
 const float    MIN_PEDAL_TOLERANCE = 0.05;    // anything less is basically zero
 const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
+const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw. (usually 1 since we monitor/limit this on our side, can be used for safety/testing).
 const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
 const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
 const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CAN packets per loop
@@ -541,7 +542,7 @@ void writeCAN() {
   }
   
   if (dcPowerTimer.check()) {
-    canControl.Send(DC_Power(0.5), TXB2);
+    canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXB2);
     
     dcPowerTimer.reset();
     delay(10);
