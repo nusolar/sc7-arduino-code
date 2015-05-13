@@ -134,6 +134,7 @@ struct CarState {
   int currentBufferIndex;                   // points to index of next value to be written
   float currentBuffer[CURRENT_BUFFER_SIZE]; // buffer to hold most recent current values from BMS
   int numOvercurrents;                      // number of current values in buffer over threshold
+  bool updateCurrentBufferRequested;        // set to true when a BMS current packet comes in.
   
   // ignition
   IgnitionState ignitionRaw;                // ingition requested by ignition switch
@@ -291,6 +292,7 @@ void readCAN() {
     else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
       BMS_VoltageCurrent packet(f);
       state.bmsCurrent = packet.current;
+      state.updateCurrentBufferRequested = true;
     }
     interrupts(); // Enable interrupts at the end of each loop, to give new messages a chance to arrive.
   }
@@ -433,22 +435,33 @@ void updateState() {
   //                       state.accelRatio;
   //}
   
-  // check for trip
-  if (state.bmsCurrent >= TRIP_CURRENT_THRESH && 
-      state.currentBuffer[state.currentBufferIndex] < TRIP_CURRENT_THRESH) { // increment overcurrent counter
-    state.numOvercurrents++;
-  }
-  else if (state.bmsCurrent < TRIP_CURRENT_THRESH && 
-           state.currentBuffer[state.currentBufferIndex] >= TRIP_CURRENT_THRESH) { // decrement overcurrent counter
-    state.numOvercurrents--;
-  }
-  state.currentBuffer[state.currentBufferIndex] = state.bmsCurrent; // store current in buffer
-  state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
+  // check for trip current condition from BMS
+  if (state.updateCurrentBufferRequested)
+  {
+    // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
+    // and the other is undercurrent, it increments/decrements the counter accordingly.
+    if (state.bmsCurrent >= TRIP_CURRENT_THRESH && 
+        state.currentBuffer[state.currentBufferIndex] < TRIP_CURRENT_THRESH) { // increment overcurrent counter
+      state.numOvercurrents++;
+    }
+    else if (state.bmsCurrent < TRIP_CURRENT_THRESH && 
+             state.currentBuffer[state.currentBufferIndex] >= TRIP_CURRENT_THRESH) { // decrement overcurrent counter
+      state.numOvercurrents--;
+    }
+
+    //Store the incoming value in the array
+    state.currentBuffer[state.currentBufferIndex] = state.bmsCurrent; // store current in buffer
+    state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
     
-  if (state.bmsCurrent >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
-      state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
-    state.tripped = true;
-    state.dcErrorFlags |= BMS_OVER_CURR;
+    //Check for a trip condition
+    if (state.bmsCurrent >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
+        state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
+      state.tripped = true;
+      state.dcErrorFlags |= BMS_OVER_CURR;
+    }
+
+    //Finally mark this update request handled
+    state.updateCurrentBufferRequested = false;
   }
   
   // update ignition state
