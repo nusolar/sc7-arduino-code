@@ -517,7 +517,7 @@ void writeCAN() {
     }
     
     // create and send packet
-    canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXB0);
+    canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
 
     delay(10);
     
@@ -531,7 +531,7 @@ void writeCAN() {
   // check if driver controls heartbeat needs to be sent
   if (dcHbTimer.check()) {
     // create and send packet
-    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXB1);
+    canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
     // reset timer
     dcHbTimer.reset(); 
@@ -545,7 +545,8 @@ void writeCAN() {
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
-                            state.gear, state.ignition), TXB0);
+                            state.gear, state.ignition),
+                TXBANY);
     
     // reset timer
     dcInfoTimer.reset();
@@ -555,7 +556,7 @@ void writeCAN() {
   }
   
   if (dcPowerTimer.check()) {
-    canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXB2);
+    canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     
     dcPowerTimer.reset();
     delay(10);
@@ -612,7 +613,7 @@ void setup() {
   CANFilterOpt filters;
   filters.setRB0(RXM0, RXF0, RXF1);
   filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, RX0IE | RX1IE);
+  canControl.Setup(filters, RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
