@@ -9,6 +9,7 @@
 #include <SPI.h>
 #include <math.h>
 #include "sc7-can-libinclude.h"
+#include "steering-defs.h"
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
@@ -28,8 +29,6 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
-const byte NEUTRAL_PIN    = 45;
-const byte REVERSE_PIN    = 47;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -78,7 +77,8 @@ const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 const byte NEUTRAL_RAW = 0x3;
 const byte FORWARD_RAW = 0x2;
 const byte REVERSE_RAW = 0x1;
-const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
+const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering wheel data
+const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board
 
 // BMS parameters
 const float TRIP_CURRENT_THRESH		= 50000; // mA
@@ -216,19 +216,30 @@ void readInputs() {
   // read ignition switch
   state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
   
-  // read gear
-  /*bool rear_on = digitalRead(REVERSE_PIN) == LOW;
-  bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
-  if (neutral_on) {
-    state.gearRaw = NEUTRAL_RAW;
+  // read steering wheel controls if steering wheel disconnected
+  if (NO_STEERING) {
+    // read gear
+    bool rear_on = digitalRead(REVERSE_PIN) == LOW;
+    bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
+    if (neutral_on) {
+      state.gearRaw = NEUTRAL_RAW;
+    }
+    else if (rear_on) {
+      state.gearRaw = REVERSE_RAW;
+    }
+    else {
+      state.gearRaw = FORWARD_RAW;
+    }
+    
+    // read lights
+    state.rightTurn = digitalRead(RIGHT_TURN_SW_PIN) == LOW;
+    state.leftTurn = digitalRead(LEFT_TURN_SW_PIN) == LOW;
+    state.headlights = digitalRead(HEADLIGHT_SW_PIN) == LOW;
+    state.hazards = digitalRead(HAZARDS_SW_PIN) == LOW;
+    
+    // other
+    state.horn = digitalRead(HORN_SW_PIN) == LOW;
   }
-  else if (rear_on) {
-    state.gearRaw = REVERSE_RAW;
-  }
-  else {
-    state.gearRaw = FORWARD_RAW;
-  }*/
-
 }
 
 /*
@@ -574,8 +585,17 @@ void setup() {
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
-  pinMode(NEUTRAL_PIN, INPUT_PULLUP);
-  pinMode(REVERSE_PIN, INPUT_PULLUP);
+  
+  // init steering wheel inputs if no steering wheel
+  if (NO_STEERING) {
+    pinMode(NEUTRAL_PIN, INPUT_PULLUP);
+    pinMode(REVERSE_PIN, INPUT_PULLUP); 
+    pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
+    pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
+    pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
+    pinMode(HAZARDS_SW_PIN, INPUT_PULLUP);
+    pinMode(HORN_SW_PIN, INPUT_PULLUP);
+  }
 
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
