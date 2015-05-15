@@ -217,7 +217,7 @@ void readInputs() {
   state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
   
   // read gear
-  bool rear_on = digitalRead(REVERSE_PIN) == LOW;
+  /*bool rear_on = digitalRead(REVERSE_PIN) == LOW;
   bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
   if (neutral_on) {
     state.gearRaw = NEUTRAL_RAW;
@@ -227,7 +227,7 @@ void readInputs() {
   }
   else {
     state.gearRaw = FORWARD_RAW;
-  }
+  }*/
 
 }
 
@@ -278,7 +278,7 @@ void readCAN() {
       SW_Data packet(f);
       
       // read data
-      //state.gearRaw = packet.gear;
+      state.gearRaw = packet.gear;
       state.horn = (packet.horn == SW_ON_BIT);
       state.rightTurn = (packet.rts == SW_ON_BIT);
       state.leftTurn = (packet.lts == SW_ON_BIT);
