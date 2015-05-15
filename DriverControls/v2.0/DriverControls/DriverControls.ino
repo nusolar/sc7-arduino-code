@@ -627,7 +627,7 @@ void loop() {
   // Start timer
   if (DEBUG)
   {
-    loopStartTime = millis();
+    loopStartTime = micros();
   }
   
   // clear watchdog timer
@@ -703,7 +703,7 @@ void loop() {
   // Add the loop time to the sum time
   if (DEBUG)
   { 
-    loopSumTime += millis() - loopStartTime;
+    loopSumTime += micros() - loopStartTime;
     loopCount += 1;
   }
   
@@ -734,7 +734,7 @@ void loop() {
       Serial.println("");
       /***************************************************************************/
     
-    Serial.print("Average Loop time: ");
+    Serial.print("Average Loop time (us): ");
     Serial.println(loopSumTime / loopCount);
     Serial.print("System time: ");
     Serial.println(millis());
