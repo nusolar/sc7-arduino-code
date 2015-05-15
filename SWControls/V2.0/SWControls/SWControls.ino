@@ -6,7 +6,7 @@
 #include <SPI.h>
 
 //#define LOOPBACK
-#define DEBUG
+//#define DEBUG
 
 /*Defining the bitwise functions (bitwise operators)
 We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
@@ -85,7 +85,7 @@ const uint16_t RXF4      = MASK_NONE;
 const uint16_t RXF5      = MASK_NONE;
 uint16_t errors;
 
-CAN_IO CanControl(CAN_CS,CAN_INT,CAN_BAUD_RATE,CAN_FREQ);
+CAN_IO CanControl(CAN_CS,CAN_BAUD_RATE,CAN_FREQ); //Try initializing without interrupts for now
 
 //Declaring switch objects (for debouncing, based on the included Switch library)
 Switch cruisecontrol(ccp);
