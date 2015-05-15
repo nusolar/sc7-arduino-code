@@ -81,7 +81,7 @@ const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT   = 0;   // value that corresponds to on for steering wheel data
 
 // BMS parameters
-const float TRIP_CURRENT_THRESH		= 50000; //mA
+const float TRIP_CURRENT_THRESH		= 50000; // mA
 const float MAX_OVERCURRENT_RATIO       = 1.2f;  // current may exceed trip threshold by this multiplier
 const int   CURRENT_BUFFER_SIZE         = 5;     // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 2;     // max number of overcurrent values allowed before trip
@@ -440,21 +440,21 @@ void updateState() {
   {
     // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
     // and the other is undercurrent, it increments/decrements the counter accordingly.
-    if (state.bmsCurrent >= TRIP_CURRENT_THRESH && 
+    if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH && 
         state.currentBuffer[state.currentBufferIndex] < TRIP_CURRENT_THRESH) { // increment overcurrent counter
       state.numOvercurrents++;
     }
-    else if (state.bmsCurrent < TRIP_CURRENT_THRESH && 
+    else if (abs(state.bmsCurrent) < TRIP_CURRENT_THRESH && 
              state.currentBuffer[state.currentBufferIndex] >= TRIP_CURRENT_THRESH) { // decrement overcurrent counter
       state.numOvercurrents--;
     }
 
     //Store the incoming value in the array
-    state.currentBuffer[state.currentBufferIndex] = state.bmsCurrent; // store current in buffer
+    state.currentBuffer[state.currentBufferIndex] = abs(state.bmsCurrent); // store current in buffer
     state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
     
     //Check for a trip condition
-    if (state.bmsCurrent >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
+    if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
         state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
       state.tripped = true;
       state.dcErrorFlags |= BMS_OVER_CURR;
@@ -773,6 +773,8 @@ void loop() {
           Serial.println("NEUTRAL");
           break;
         }
+        Serial.print("Car tripped: ");
+        Serial.println(state.tripped ? "YES" : "NO");
       break;
       ///////////////////
       case 1:
