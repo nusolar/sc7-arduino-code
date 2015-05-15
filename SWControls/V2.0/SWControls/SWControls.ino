@@ -6,7 +6,7 @@
 #include <SPI.h>
 
 //#define LOOPBACK
-//#define DEBUG
+#define DEBUG
 
 /*Defining the bitwise functions (bitwise operators)
 We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
@@ -34,6 +34,8 @@ to compare the switch states and determine whether there has been a change or no
 char young = 0xFF; //young is continuously assigned to the new switch states
 char old;          //old is the previous switch states
 
+//Conversion data for displayed measurements
+#define MPS_TO_MPH 2.2369f
 
 //Steering Wheel LCD Info - the position on the LCD
 const int SOC = 8;    //state of charge (from CAN)
@@ -99,8 +101,8 @@ struct LCD{
   char CCdisplay;        //'C' = cruise control on, ' ' = cruise control off
   char geardisplay;      //'F' = forward, 'R' = reverse, 'N' = neutral
   String Lightsdisplay;  //"H" = headlights, "HZ" = hazardlights, " " = no lights
-  int SOCdisplay;        //state of charge (from CAN)
-  int Veldisplay;        //velocity (from CAN)
+  float SOCdisplay;        //state of charge (from CAN)
+  float Veldisplay;        //velocity (from CAN)
   boolean LTdisplay;     //distinguishes left turn
   boolean RTdisplay;     //distinguishes right turn
   boolean turnsignal_on; //whether turn signal is on/off
@@ -150,8 +152,8 @@ void setup() {
    * RB1 can be used for other packets as needed.
    */
   CANFilterOpt filter;
-  filter.setRB0(MASK_Sxxx,BMS_SOC_ID,MC_VELOCITY_ID); 
-  filter.setRB1(MASK_NONE,0,0,0,0);
+  filter.setRB0(MASK_Sxxx,BMS_SOC_ID,0); 
+  filter.setRB1(MASK_Sxxx,MC_VELOCITY_ID,0,0,0);
   CanControl.Setup(filter, RX0IE|RX1IE);
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
@@ -163,6 +165,11 @@ void setup() {
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
+  
+#ifdef DEBUG
+  Serial.print("CANINTE: " );
+  Serial.println(CanControl.controller.Read(CANINTE), BIN);
+#ifdef DEBUG
 }
 
 //assigns appropriate value to the bit from the state of the pin
@@ -214,13 +221,13 @@ inline void defaultdisplay(){
   screen.setCursor(1,4);
   screen.print("SOC:  %");
   screen.setCursor(1,SOC);
-  screen.print(steering_wheel.SOCdisplay);
+  screen.print(int(steering_wheel.SOCdisplay*100));
   screen.setCursor(1,LIGHT);
   screen.print(steering_wheel.Lightsdisplay);
   screen.setCursor(2,4);
   screen.print("V:");
   screen.setCursor(2,V);
-  screen.print(steering_wheel.Veldisplay);
+  screen.print(int(min(99,steering_wheel.Veldisplay*MPS_TO_MPH)));
   screen.setCursor(2,CC);
   screen.print(steering_wheel.CCdisplay);
   screen.setCursor(2,GEAR);
@@ -347,17 +354,27 @@ void loop() {
 
   wdt_reset();
 
-  // Check whether a CAN packet is available to read
+  // Fetch any potential messages from the MCP2515
+  CanControl.Fetch(); 
+  
+  // Check whether a CAN packet has been loaded and is available to read:
   if (CanControl.Available()){
     
     // Use available CAN packets (BMS SOC and MC Velocity) to assign values to appropriate members of the data structures
     Frame& f = CanControl.Read();
+ #ifdef DEBUG
+    Serial.print("Received: " );
+    Serial.println(f.id, HEX);
+ #endif
     switch (f.id)
     {
       case BMS_SOC_ID:
       {
         BMS_SOC packet(f); //This is where we get the State of charge
         steering_wheel.SOCdisplay = packet.percent_SOC;
+        #ifdef DEBUG
+          Serial.print(packet.percent_SOC);
+        #endif
         CAN_RX.reset();
         break;
       }
@@ -365,12 +382,12 @@ void loop() {
       {
         MC_Velocity packet(f); // This is where we get the velocity
         steering_wheel.Veldisplay = packet.car_velocity;
+        #ifdef DEBUG
+          Serial.print(packet.car_velocity);
+        #endif
         CAN_RX.reset();
         break;
       }
-      case SW_DATA_ID:
-        Serial.print("CAN RECEIVED");
-        break;
     }
   }
   // else if (CAN_RX.check()){
@@ -391,6 +408,8 @@ void loop() {
       Serial.print(CanControl.tec); Serial.print(", "); Serial.println(CanControl.rec);
       Serial.print("CANSTATUS: ");
       Serial.println(CanControl.canstat_register);
+      Serial.print("CANINTF: ");
+      Serial.println(CanControl.controller.Read(CANINTF), BIN);
     }
   #endif
 }
