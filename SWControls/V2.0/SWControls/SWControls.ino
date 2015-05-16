@@ -169,7 +169,7 @@ void setup() {
 #ifdef DEBUG
   Serial.print("CANINTE: " );
   Serial.println(CanControl.controller.Read(CANINTE), BIN);
-#ifdef DEBUG
+#endif
 }
 
 //assigns appropriate value to the bit from the state of the pin
@@ -227,7 +227,7 @@ inline void defaultdisplay(){
   screen.setCursor(2,4);
   screen.print("V:");
   screen.setCursor(2,V);
-  screen.print(int(min(99,steering_wheel.Veldisplay*MPS_TO_MPH)));
+  screen.print(int(min(99,steering_wheel.Veldisplay)));
   screen.setCursor(2,CC);
   screen.print(steering_wheel.CCdisplay);
   screen.setCursor(2,GEAR);
@@ -373,7 +373,7 @@ void loop() {
         BMS_SOC packet(f); //This is where we get the State of charge
         steering_wheel.SOCdisplay = packet.percent_SOC;
         #ifdef DEBUG
-          Serial.print(packet.percent_SOC);
+          Serial.print(steering_wheel.SOCdisplay);
         #endif
         CAN_RX.reset();
         break;
@@ -381,9 +381,9 @@ void loop() {
       case MC_VELOCITY_ID:
       {
         MC_Velocity packet(f); // This is where we get the velocity
-        steering_wheel.Veldisplay = packet.car_velocity;
+        steering_wheel.Veldisplay = packet.car_velocity*MPS_TO_MPH;
         #ifdef DEBUG
-          Serial.print(packet.car_velocity);
+          Serial.print(steering_wheel.Veldisplay);
         #endif
         CAN_RX.reset();
         break;
