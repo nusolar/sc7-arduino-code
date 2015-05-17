@@ -78,7 +78,7 @@ const byte NEUTRAL_RAW = 0x3;
 const byte FORWARD_RAW = 0x2;
 const byte REVERSE_RAW = 0x1;
 const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering wheel data
-const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board
+const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
 const float TRIP_CURRENT_THRESH		= 50000; // mA
@@ -114,7 +114,8 @@ struct CarState {
   uint16_t regenRaw; // raw voltage reading from regen input
   uint16_t accelRaw; // raw voltage reading from accel input
   
-  // steering wheel info
+  // steering wheel info (if we need to go to digital controls on the driver box)
+  bool altSteeringEnable; // true if we are using alternate steering
   byte gearRaw;       // 00 = neutral, 01 = forward, 10 = reverse, 11 = undefined
   bool horn;          // true if driver wants horn on (no toggle)
   bool headlights;    // true if driver wants headlights on (no toggle)
@@ -217,7 +218,7 @@ void readInputs() {
   state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
   
   // read steering wheel controls if steering wheel disconnected
-  if (NO_STEERING) {
+  if (state.altSteeringEnable) {
     // read gear
     bool rear_on = digitalRead(REVERSE_PIN) == LOW;
     bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
@@ -482,6 +483,12 @@ void updateState() {
   else {
     state.ignition = state.ignitionRaw;
   }
+  
+  //Enable alternate steering if the SW is disconnected.
+  if (NO_STEERING || state.dcErrorFlags & SW_TIMEOUT)
+    state.altSteeringEnable = true;
+  else
+    state.altSteeringEnable = false;
 }
 
 /*
