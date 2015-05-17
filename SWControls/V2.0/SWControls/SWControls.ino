@@ -221,13 +221,13 @@ inline void defaultdisplay(){
   screen.setCursor(1,4);
   screen.print("SOC:  %");
   screen.setCursor(1,SOC);
-  screen.print(int(steering_wheel.SOCdisplay*100));
+  screen.print(int(steering_wheel.SOCdisplay));
   screen.setCursor(1,LIGHT);
   screen.print(steering_wheel.Lightsdisplay);
   screen.setCursor(2,4);
   screen.print("V:");
   screen.setCursor(2,V);
-  screen.print(int(min(99,steering_wheel.Veldisplay)));
+  screen.print(min(99,int(steering_wheel.Veldisplay)));
   screen.setCursor(2,CC);
   screen.print(steering_wheel.CCdisplay);
   screen.setCursor(2,GEAR);
@@ -371,7 +371,7 @@ void loop() {
       case BMS_SOC_ID:
       {
         BMS_SOC packet(f); //This is where we get the State of charge
-        steering_wheel.SOCdisplay = packet.percent_SOC;
+        steering_wheel.SOCdisplay = packet.percent_SOC*100;
         #ifdef DEBUG
           Serial.print(steering_wheel.SOCdisplay);
         #endif
