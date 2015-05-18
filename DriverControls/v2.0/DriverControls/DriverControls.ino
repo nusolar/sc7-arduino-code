@@ -593,8 +593,7 @@ void setup() {
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
   
-  // init steering wheel inputs if no steering wheel
-  if (NO_STEERING) {
+  // init steering wheel inputs for use if we loose the steering wheel
     pinMode(NEUTRAL_PIN, INPUT_PULLUP);
     pinMode(REVERSE_PIN, INPUT_PULLUP); 
     pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
@@ -602,7 +601,7 @@ void setup() {
     pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
     pinMode(HAZARDS_SW_PIN, INPUT_PULLUP);
     pinMode(HORN_SW_PIN, INPUT_PULLUP);
-  }
+
 
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
