@@ -4,6 +4,7 @@
 #include <serLCD.h>
 #include <avr/wdt.h>
 #include <SPI.h>
+#include <math.h>
 
 //#define LOOPBACK
 #define DEBUG
@@ -120,6 +121,9 @@ void displayNotification();
 void loop();
 void initializePins();
 void checkProgrammingMode();
+
+long loopStartTime = 0;
+long loopSumTime = 0;
 
 void setup() {
   
@@ -250,6 +254,11 @@ inline void displayNotification(){
 
 
 void loop() {  
+  if(DEBUG)
+  {
+  loopStartTime = micros();
+  }
+  
   wdt_reset();
   old = young;
   
@@ -398,6 +407,11 @@ void loop() {
   //Debug for CAN
   CanControl.FetchErrors();
   CanControl.FetchStatus();
+  
+  if(DEBUG)
+  {
+    loopSumTime += (micros() - loopStartTime);
+  }
   
   #ifdef DEBUG
     if (debug_timer.check())
