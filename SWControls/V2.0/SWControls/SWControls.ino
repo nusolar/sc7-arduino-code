@@ -122,8 +122,9 @@ void loop();
 void initializePins();
 void checkProgrammingMode();
 
-long loopStartTime = 0;
-long loopSumTime = 0;
+unsigned long loopStartTime = 0;
+unsigned long loopSumTime = 0;
+unsigned long loopCount = 0;
 
 void setup() {
   
@@ -254,10 +255,9 @@ inline void displayNotification(){
 
 
 void loop() {  
-  if(DEBUG)
-  {
-  loopStartTime = micros();
-  }
+  #ifdef DEBUG
+    loopStartTime = micros();
+  #endif
   
   wdt_reset();
   old = young;
@@ -407,11 +407,11 @@ void loop() {
   //Debug for CAN
   CanControl.FetchErrors();
   CanControl.FetchStatus();
-  
-  if(DEBUG)
-  {
+
+  #ifdef DEBUG
     loopSumTime += (micros() - loopStartTime);
-  }
+    loopCount += 1;
+  #endif
   
   #ifdef DEBUG
     if (debug_timer.check())
@@ -424,6 +424,13 @@ void loop() {
       Serial.println(CanControl.canstat_register);
       Serial.print("CANINTF: ");
       Serial.println(CanControl.controller.Read(CANINTF), BIN);
+      Serial.print("Average Loop Time (us): ");
+      Serial.println(loopSumTime/loopCount);
+      Serial.print("System time: ");
+      Serial.println(millis());
+      
+      loopSumTime = 0;
+      loopCount = 0;
     }
   #endif
 }
