@@ -81,10 +81,10 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board
 
 // BMS parameters
-const float TRIP_CURRENT_THRESH		= 50000; // mA
-const float MAX_OVERCURRENT_RATIO       = 1.2f;  // current may exceed trip threshold by this multiplier
-const int   CURRENT_BUFFER_SIZE         = 5;     // number of current values from BMS stored
-const int   OVERCURRENTS_ALLOWED        = 2;     // max number of overcurrent values allowed before trip
+const float MAX_CURRENT_THRESH		      = 68000; // mA
+const float CONTINUOUS_CURRENT_THRESH   = 35000; // current may exceed this value no more than 20 times in 200 ms.
+const int   CURRENT_BUFFER_SIZE         = 40;    // number of current values from BMS stored
+const int   OVERCURRENTS_ALLOWED        = 20;    // max number of overcurrent values allowed before trip
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
@@ -451,21 +451,23 @@ void updateState() {
   {
     // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
     // and the other is undercurrent, it increments/decrements the counter accordingly.
-    if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH && 
-        state.currentBuffer[state.currentBufferIndex] < TRIP_CURRENT_THRESH) { // increment overcurrent counter
+    float absBMSCurrent = abs(state.bmsCurrent);
+
+    if (absBMSCurrent >= CONTINUOUS_CURRENT_THRESH && 
+        state.currentBuffer[state.currentBufferIndex] < CONTINUOUS_CURRENT_THRESH) { // increment overcurrent counter
       state.numOvercurrents++;
     }
-    else if (abs(state.bmsCurrent) < TRIP_CURRENT_THRESH && 
-             state.currentBuffer[state.currentBufferIndex] >= TRIP_CURRENT_THRESH) { // decrement overcurrent counter
+    else if (absBMSCurrent < CONTINUOUS_CURRENT_THRESH && 
+             state.currentBuffer[state.currentBufferIndex] >= CONTINUOUS_CURRENT_THRESH) { // decrement overcurrent counter
       state.numOvercurrents--;
     }
 
     //Store the incoming value in the array
-    state.currentBuffer[state.currentBufferIndex] = abs(state.bmsCurrent); // store current in buffer
+    state.currentBuffer[state.currentBufferIndex] = absBMSCurrent; // store current in buffer
     state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
     
     //Check for a trip condition
-    if (abs(state.bmsCurrent) >= TRIP_CURRENT_THRESH * MAX_OVERCURRENT_RATIO ||
+    if (absBMSCurrent >= MAX_CURRENT_THRESH ||
         state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
       state.tripped = true;
       state.dcErrorFlags |= BMS_OVER_CURR;
