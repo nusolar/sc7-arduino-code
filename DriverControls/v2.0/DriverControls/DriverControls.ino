@@ -143,6 +143,7 @@ struct CarState {
   // debugging
   bool wasReset;       // true on initilization, false otherwise
   byte canstat_reg;    // holds value of canstat register on the MCP2515
+  int SW_timer_reset_by;
   
   // DERIVED DATA
   // pedals
@@ -220,8 +221,8 @@ void readInputs() {
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
     // read gear
-    bool rear_on = digitalRead(REVERSE_PIN) == LOW;
-    bool neutral_on = digitalRead(NEUTRAL_PIN) == LOW;
+    bool rear_on = (digitalRead(REVERSE_PIN) == LOW);
+    bool neutral_on = (digitalRead(NEUTRAL_PIN) == LOW);
     if (neutral_on) {
       state.gearRaw = NEUTRAL_RAW;
     }
@@ -255,6 +256,7 @@ void readCAN() {
     /**************************************************************************/
     safetyCount++;                // Increment safety counter
     noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
+    // Don't put serial inside this function
     Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
@@ -267,9 +269,11 @@ void readCAN() {
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sx00) == SW_BASEADDRESS) { // source is sw
+    else if ((f.id & MASK_Sxx0) == SW_BASEADDRESS) { // source is sw
+      // We need to use Sxx0 because there is a 7FC packet on the bus somehow (even though it doesn't show up on the Ethernet Bridge).
       swHbTimer.reset();
       state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
+      state.SW_timer_reset_by = f.id;
     }
     
     // check for specific packets
@@ -799,6 +803,8 @@ void loop() {
           Serial.println("NEUTRAL");
           break;
         }
+        Serial.print("Gear Raw: ");
+        Serial.println(state.gearRaw);
         Serial.print("Car tripped: ");
         Serial.println(state.tripped ? "YES" : "NO");
       break;
@@ -845,7 +851,13 @@ void loop() {
         Serial.println(state.dcErrorFlags, HEX);
         Serial.print("BMS Current: ");
         Serial.println(state.bmsCurrent);
-     break;
+        if (state.SW_timer_reset_by != 0)
+         {
+           Serial.print("SW RESET BY: ");
+           Serial.println(state.SW_timer_reset_by, HEX);
+           state.SW_timer_reset_by = 0;
+         }
+        break;
     }
     
     Serial.print("System time: ");
