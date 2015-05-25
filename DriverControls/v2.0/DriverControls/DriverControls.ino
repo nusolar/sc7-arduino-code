@@ -74,9 +74,9 @@ const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
 
 // steering wheel parameters
-const byte NEUTRAL_RAW = 0x3;
-const byte FORWARD_RAW = 0x2;
-const byte REVERSE_RAW = 0x1;
+const byte NEUTRAL_RAW = 0x03;
+const byte FORWARD_RAW = 0x02;
+const byte REVERSE_RAW = 0x01;
 const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering wheel data
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
