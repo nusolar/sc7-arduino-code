@@ -81,10 +81,10 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float TRIP_CURRENT_THRESH		= 50000; // mA
+const float TRIP_CURRENT_THRESH		= 68000; // mA
 const float MAX_OVERCURRENT_RATIO       = 1.2f;  // current may exceed trip threshold by this multiplier
-const int   CURRENT_BUFFER_SIZE         = 5;     // number of current values from BMS stored
-const int   OVERCURRENTS_ALLOWED        = 2;     // max number of overcurrent values allowed before trip
+const int   CURRENT_BUFFER_SIZE         = 10;     // number of current values from BMS stored
+const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
 
 // driver control errors
 const uint16_t MC_TIMEOUT  = 0x01; // motor controller timed out
