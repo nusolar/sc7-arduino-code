@@ -248,11 +248,11 @@ void readInputs() {
  * Reads packets from CAN message queue and updates car state.
  */
 void readCAN() {
-  int safetyCount = 0;
+  int safetyCount = 0;  
+  String unknownPacketData = "";
   while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
     /************************** DEBUG CODE (REMOVE LATER) ***********************/
-    //Serial.print("ReadBuffer: ");
-    //Serial.println(canControl.RXbuffer.size());
+    unknownPacketData = "";
     /**************************************************************************/
     safetyCount++;                // Increment safety counter
     noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
@@ -310,7 +310,20 @@ void readCAN() {
       state.bmsCurrent = packet.current;
       state.updateCurrentBufferRequested = true;
     }
+    /******************** DEBUG COde ********************/
+    else // unknown packet
+    {
+      unknownPacketData = frameToString(f);
+    }
+    /*****************************************************/
     interrupts(); // Enable interrupts at the end of each loop, to give new messages a chance to arrive.
+
+    /************* MORE DEBUG CODE **********************/
+    if (DEBUG && unknownPacketData != "") 
+    {
+      Serial.print("Unk. Packet: "); Serial.println(unknownPacketData);
+    }
+    /*****************************************************/
   }
 }
 
