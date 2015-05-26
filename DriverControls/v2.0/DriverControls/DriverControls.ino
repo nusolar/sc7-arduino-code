@@ -539,19 +539,18 @@ void writeCAN() {
     }
     
     // create and send packet
-    canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
-
-    delay(10);
+    bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
     
     // reset timer
-    dcDriveTimer.reset();
+    if (trysend) 
+      dcDriveTimer.reset();
        
     delay(10); // mcp2515 seems to require small delay
 
   }
   
   // check if driver controls heartbeat needs to be sent
-  if (dcHbTimer.check()) {
+  /*if (dcHbTimer.check()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
@@ -559,28 +558,33 @@ void writeCAN() {
     dcHbTimer.reset(); 
     
    	delay(10);
-  }
-  
+  }*/
+
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.check()) {
     // create and send packet
-    canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged,
+    DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
-                            state.gear, state.ignition),
+                            state.gear, state.ignition);
+    Serial.println(frameToString(packet.generate_frame()));
+                            
+    bool trysend = canControl.Send(packet,
                 TXBANY);
     
     // reset timer
-    dcInfoTimer.reset();
+    if (trysend) 
+      dcInfoTimer.reset();
     
     state.wasReset = false; // clear reset    
     delay(10); // mcp2515 seems to require small delay
   }
   
   if (dcPowerTimer.check()) {
-    canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
+    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     
-    dcPowerTimer.reset();
+    if (trysend) 
+      dcPowerTimer.reset();
     delay(10);
   }
 }
