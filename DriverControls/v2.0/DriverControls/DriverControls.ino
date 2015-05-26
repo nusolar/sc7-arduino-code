@@ -36,7 +36,7 @@ const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sx00;
 const uint16_t RXF0      = SW_BASEADDRESS; // Match any steering_wheel packet (because mask is Sx00)
-const uint16_t RXF1      = 0;
+const uint16_t RXF1      = SW_BASEADDRESS; // Can't put 0 here, otherwise it will match all packets that start with 0.
 
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF2      = BMS_VOLT_CURR_ID;
