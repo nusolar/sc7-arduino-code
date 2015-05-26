@@ -251,8 +251,8 @@ void readCAN() {
   int safetyCount = 0;
   while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
     /************************** DEBUG CODE (REMOVE LATER) ***********************/
-    Serial.print("ReadBuffer: ");
-    Serial.println(canControl.RXbuffer.size());
+    //Serial.print("ReadBuffer: ");
+    //Serial.println(canControl.RXbuffer.size());
     /**************************************************************************/
     safetyCount++;                // Increment safety counter
     noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
