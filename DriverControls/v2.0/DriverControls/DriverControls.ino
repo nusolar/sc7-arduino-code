@@ -583,7 +583,7 @@ void writeCAN() {
     Serial.println(frameToString(packet.generate_frame()));
                             
     bool trysend = canControl.Send(packet,
-                TXBANY);
+                TXBANY, VERIFY);
     
     // reset timer
     if (trysend) 
