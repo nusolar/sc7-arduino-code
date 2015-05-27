@@ -78,14 +78,6 @@ const byte     CAN_CS 	 = 10;
 const byte	   CAN_INT	 = 1; // Not the pin number, the interrupt number (https://learn.sparkfun.com/tutorials/pro-micro--fio-v3-hookup-guide/hardware-overview-pro-micro)
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
-const uint16_t RXM0      = MASK_NONE;
-const uint16_t RXM1      = MASK_NONE;
-const uint16_t RXF0      = MASK_NONE;
-const uint16_t RXF1      = MASK_NONE;
-const uint16_t RXF2      = MASK_NONE;
-const uint16_t RXF3      = MASK_NONE;
-const uint16_t RXF4      = MASK_NONE;
-const uint16_t RXF5      = MASK_NONE;
 uint16_t errors;
 
 CAN_IO CanControl(CAN_CS,CAN_BAUD_RATE,CAN_FREQ); //Try initializing without interrupts for now
