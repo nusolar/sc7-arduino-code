@@ -65,7 +65,7 @@ Metro CAN_TX = Metro(1000);
 //3rd: CAN Reception timer - duration between CAN packets received (will trigger error if it expires)
 Metro CAN_RX = Metro(1000);
 //4th: Notification Timer - duration for which notification is displayed
-Metro notif_timer = Metro(1000);
+Metro notif_timer = Metro(500);
 //5th: Display Timer - frequency at which display will refresh if nothing changes
 Metro display_timer = Metro(500);
 //6th: Turn signal blinking timer
@@ -248,7 +248,8 @@ inline void defaultdisplay(){
 
 //Notification display function
 inline void displayNotification(){
-  screen.clear();
+  //screen.clear();
+  screen.clearLine(1);
   screen.selectLine(1);
   screen.print(steering_wheel.notification);
 }
@@ -346,6 +347,7 @@ void loop() {
     else steering_wheel.RTdisplay = false;
 
     if (notif_timer.running()){
+      defaultdisplay();
       displayNotification();
     }
     else{
