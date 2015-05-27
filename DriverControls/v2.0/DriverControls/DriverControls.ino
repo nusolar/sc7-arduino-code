@@ -552,7 +552,7 @@ void writeCAN() {
     }
     
     // create and send packet
-    bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
+    bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY, VERIFY);
     
     // reset timer
     if (trysend) 
@@ -582,8 +582,7 @@ void writeCAN() {
                             state.gear, state.ignition);
     Serial.println(frameToString(packet.generate_frame()));
                             
-    bool trysend = canControl.Send(packet,
-                TXBANY, VERIFY);
+    bool trysend = canControl.Send(packet, TXBANY, VERIFY);
     
     // reset timer
     if (trysend) 
@@ -594,7 +593,7 @@ void writeCAN() {
   }
   
   if (dcPowerTimer.check()) {
-    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
+    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY, VERIFY);
     
     if (trysend) 
       dcPowerTimer.reset();
