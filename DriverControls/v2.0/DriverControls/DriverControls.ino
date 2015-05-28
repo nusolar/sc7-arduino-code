@@ -552,7 +552,7 @@ void writeCAN() {
     }
     
     // create and send packet
-    bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY, VERIFY);
+    bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
     
     // reset timer
     if (trysend) 
@@ -580,7 +580,6 @@ void writeCAN() {
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
                             state.gear, state.ignition);
-    Serial.println(frameToString(packet.generate_frame()));
                             
     bool trysend = canControl.Send(packet, TXBANY, VERIFY);
     
@@ -593,7 +592,7 @@ void writeCAN() {
   }
   
   if (dcPowerTimer.check()) {
-    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY, VERIFY);
+    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     
     if (trysend) 
       dcPowerTimer.reset();
