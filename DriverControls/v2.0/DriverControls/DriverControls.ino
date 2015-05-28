@@ -581,7 +581,7 @@ void writeCAN() {
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
                             state.gear, state.ignition);
                             
-    bool trysend = canControl.Send(packet, TXBANY, VERIFY);
+    bool trysend = canControl.SendVerified(packet, TXBANY);
     
     // reset timer
     if (trysend) 
@@ -730,12 +730,6 @@ void loop() {
   canControl.FetchStatus();
   if ((canControl.canstat_register & 0b00100000) == 0b00100000)
   {
-    /*canControl.controller.Write(CANCTRL,0x07);
-    // Clear all pending transmissions so that we can change modes.
-    canControl.controller.BitModify(TXB0CTRL,0x08,0x00);
-    canControl.controller.BitModify(TXB1CTRL,0x08,0x00);
-    canControl.controller.BitModify(TXB2CTRL,0x08,0x00);
-    delay(10);*/
     canControl.ResetController();
     canControl.FetchStatus(); // check that everything worked
     if (DEBUG)
