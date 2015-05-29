@@ -34,13 +34,13 @@ const byte BOARDLED       = 13;
 const uint16_t BAUD_RATE = 1000;
 const byte     FREQ      = 16;
 
-const uint16_t RXM0      = MASK_Sx00;
-const uint16_t RXF0      = SW_BASEADDRESS; // Match any steering_wheel packet (because mask is Sx00)
-const uint16_t RXF1      = SW_BASEADDRESS; // Can't put 0 here, otherwise it will match all packets that start with 0.
+const uint16_t RXM0      = MASK_Sxxx;
+const uint16_t RXF0      = 0; // Match any steering_wheel packet (because mask is Sx00)
+const uint16_t RXF1      = BMS_VOLT_CURR_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
 
 const uint16_t RXM1      = MASK_Sxxx;
-const uint16_t RXF2      = BMS_VOLT_CURR_ID;
-const uint16_t RXF3      = BMS_SOC_ID; // Most useless: replace first (soc not used by DC currently)
+const uint16_t RXF2      = SW_DATA_ID;
+const uint16_t RXF3      = 0; // Most useless: replace first (soc not used by DC currently)
 const uint16_t RXF4      = MC_VELOCITY_ID;
 const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
 
@@ -62,7 +62,7 @@ const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
 const float    MAX_ACCEL_RATIO     = 0.8;     // maximum safe accel ratio
 const uint16_t MAX_REGEN_VOLTAGE   = 1024;    // max possible regen voltage
 const float    MAX_REGEN_RATIO     = 1.0;     // maximum safe regen ratio
-const float    MIN_PEDAL_TOLERANCE = 0.05;    // anything less is basically zero
+const float    MIN_PEDAL_TOLERANCE = 0.07;    // anything less is basically zero
 const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
 const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw. (usually 1 since we monitor/limit this on our side, can be used for safety/testing).
@@ -557,8 +557,6 @@ void writeCAN() {
     // reset timer
     if (trysend) 
       dcDriveTimer.reset();
-       
-    delay(10); // mcp2515 seems to require small delay
 
   }
   
@@ -588,7 +586,6 @@ void writeCAN() {
       dcInfoTimer.reset();
     
     state.wasReset = false; // clear reset    
-    delay(10); // mcp2515 seems to require small delay
   }
   
   if (dcPowerTimer.check()) {
@@ -596,7 +593,6 @@ void writeCAN() {
     
     if (trysend) 
       dcPowerTimer.reset();
-    delay(10);
   }
 }
 
@@ -680,6 +676,8 @@ void loop() {
   
   // read GPIO
   readInputs();
+
+  canControl.Fetch();
     
   // read CAN
   readCAN();
@@ -695,13 +693,15 @@ void loop() {
   
   // process information that was read
   updateState();
+
+  canControl.Fetch();
   
   // write GPIO
   writeOutputs();
   
   // write CAN
   writeCAN();
-  
+
   // clear watchdog timer
   WDT_Restart(WDT);
 
