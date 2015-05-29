@@ -654,10 +654,9 @@ void setup() {
   
   
   // setup CAN
-  CANFilterOpt filters;
-  filters.setRB0(RXM0, RXF0, RXF1);
-  filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
-  canControl.Setup(filters, RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
+  canControl.filters.setRB0(RXM0, RXF0, RXF1);
+  canControl.filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
+  canControl.Setup(RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
