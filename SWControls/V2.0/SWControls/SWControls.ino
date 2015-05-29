@@ -75,12 +75,12 @@ Metro debug_timer = Metro(200);
 
 //CAN parameters
 const byte     CAN_CS 	 = 10;
-const byte	   CAN_INT	 = 1; // Not the pin number, the interrupt number (https://learn.sparkfun.com/tutorials/pro-micro--fio-v3-hookup-guide/hardware-overview-pro-micro)
+const byte	   CAN_INT	 = 2; // Interrupt #1
 const uint16_t CAN_BAUD_RATE = 1000;
 const byte     CAN_FREQ      = 16;
 uint16_t errors;
 
-CAN_IO CanControl(CAN_CS,CAN_BAUD_RATE,CAN_FREQ); //Try initializing without interrupts for now
+CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); //Try initializing without interrupts for now
 
 //Declaring switch objects (for debouncing, based on the included Switch library)
 Switch cruisecontrol(ccp);
@@ -148,10 +148,10 @@ void setup() {
    * Configure RB0 to take SOC and Velocity packets for the display.
    * RB1 can be used for other packets as needed.
    */
-  CANFilterOpt filter;
-  filter.setRB0(MASK_Sxxx,BMS_SOC_ID,0); 
-  filter.setRB1(MASK_Sxxx,MC_VELOCITY_ID,0,0,0);
-  CanControl.Setup(filter, RX0IE|RX1IE);
+  CanControl.filters.setRB0(MASK_Sxxx,BMS_SOC_ID,0); 
+  CanControl.filters.setRB1(MASK_Sxxx,MC_VELOCITY_ID,0,0,0);
+  CanControl.Setup(RX0IE|RX1IE);
+
 #ifdef LOOPBACK 
   Serial.print("Set Loopback"); 
   CanControl.controller.Mode(MODE_LOOPBACK); 
