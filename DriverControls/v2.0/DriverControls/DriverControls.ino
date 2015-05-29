@@ -48,14 +48,14 @@ const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now sinc
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
 const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
-const uint16_t DC_DRIVE_INTERVAL = 150;    // drive command packet
+const uint16_t DC_DRIVE_INTERVAL = 150;   // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
-const uint16_t DC_HB_INTERVAL    = 200;   // driver controls heartbeat packet
-const uint16_t DC_POWER_INTERVAL = 1000; // driver controls power packet
+const uint16_t DC_HB_INTERVAL    = 1000;  // driver controls heartbeat packet
+const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
-const uint16_t DEBUG_INTERVAL    = 333;  // interval for debug calls output
-const int      SERIAL_BAUD       = 115200; // baudrate for serial (maximum)
+const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
+const int      SERIAL_BAUD       = 115200;// baudrate for serial (maximum)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -82,7 +82,7 @@ const bool NO_STEERING = false;    // set to true to read light, horn, gear cont
 
 // BMS parameters
 const float MAX_CURRENT_THRESH		      = 68000; // mA
-const float CONTINUOUS_CURRENT_THRESH   = 40000; // current may exceed this value no more than 20 times in 200 ms.
+const float CONTINUOUS_CURRENT_THRESH   = 40000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;    // max number of overcurrent values allowed before trip
 
@@ -270,8 +270,7 @@ void readCAN() {
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sxx0) == SW_BASEADDRESS) { // source is sw
-      // We need to use Sxx0 because there is a 7FC packet on the bus somehow (even though it doesn't show up on the Ethernet Bridge).
+    else if ((f.id & MASK_Sx00) == SW_BASEADDRESS) { // source is sw
       swHbTimer.reset();
       state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
       state.SW_timer_reset_by = f.id;
@@ -295,12 +294,12 @@ void readCAN() {
       SW_Data packet(f);
       
       // read data
-      state.gearRaw = packet.gear;
-      state.horn = (packet.horn == SW_ON_BIT);
+      state.gearRaw =    packet.gear;
+      state.horn =      (packet.horn == SW_ON_BIT);
       state.rightTurn = (packet.rts == SW_ON_BIT);
-      state.leftTurn = (packet.lts == SW_ON_BIT);
-      state.headlights = (packet.headlights == SW_ON_BIT);
-      state.hazards = (packet.hazards == SW_ON_BIT);
+      state.leftTurn =  (packet.lts == SW_ON_BIT);
+      state.headlights =(packet.headlights == SW_ON_BIT);
+      state.hazards =   (packet.hazards == SW_ON_BIT);
       
       // read cruise control
       //state.cruiseCtrlPrev = state.cruiseCtrl;
@@ -564,15 +563,13 @@ void writeCAN() {
   }
   
   // check if driver controls heartbeat needs to be sent
-  /*if (dcHbTimer.check()) {
+  if (dcHbTimer.check()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
     // reset timer
     dcHbTimer.reset(); 
-    
-   	delay(10);
-  }*/
+  }
 
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.check()) {
