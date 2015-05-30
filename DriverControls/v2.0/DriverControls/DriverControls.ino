@@ -250,18 +250,11 @@ void readInputs() {
  */
 void readCAN() {
   int safetyCount = 0;  
-  String unknownPacketData = "";
   while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
-    /************************** DEBUG CODE (REMOVE LATER) ***********************/
-    unknownPacketData = "";
-    /**************************************************************************/
     safetyCount++;                // Increment safety counter
-    noInterrupts();               // Disable interrupts while reading messages. This is so we don't have new messages being written at the same time
-    // Don't put serial inside this function
     Frame& f = canControl.Read(); // read one message
     
     // determine source and update heartbeat timers
-    // first three digits will be exactly equal to heartbeat ids
     if ((f.id & MASK_Sx00) == BMS_BASEADDRESS) { // source is bms
       bmsHbTimer.reset();
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
@@ -310,18 +303,10 @@ void readCAN() {
       state.bmsCurrent = packet.current;
       state.updateCurrentBufferRequested = true;
     }
-    /******************** DEBUG COde ********************/
-    else // unknown packet
-    {
-      unknownPacketData = frameToString(f);
-    }
-    /*****************************************************/
-    interrupts(); // Enable interrupts at the end of each loop, to give new messages a chance to arrive.
-
     /************* MORE DEBUG CODE **********************/
-    if (DEBUG && unknownPacketData != "") 
+    else if (DEBUG) 
     {
-      Serial.print("Unk. Packet: "); Serial.println(unknownPacketData);
+      Serial.print("Unk. Packet: "); Serial.println(frameToString(f));
     }
     /*****************************************************/
   }
@@ -346,13 +331,6 @@ void checkTimers() {
   if (swHbTimer.check()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
   }
-}
-
-/*
- * Checks the CAN controller and any other components for errors.
- * If errors exist, updates the error state.
- */
-void checkErrors() {
 }
 
 /*
@@ -596,6 +574,47 @@ void writeCAN() {
   }
 }
 
+/*
+ * Checks the CAN controller and any other components for errors.
+ * If errors exist, updates the error state.
+ */
+void checkErrors() {
+  //Check the can bus for errors
+  canControl.FetchErrors();
+  
+  // Reset the MCP if we are heading towards a bus_off condition
+  if (canControl.tec > 200 || canControl.rec > 200)
+  {
+    if (DEBUG)
+    {
+      Serial.println("Reseting MCP2515");
+      Serial.print("TEC/REC: ");
+      Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+    }
+    canControl.ResetController();
+    if (DEBUG)
+    {
+      Serial.println("Reset MCP2515");
+    }
+
+    state.dcErrorFlags |= RESET_MCP2515;
+  }
+  
+  // Check the mode of the MCP2515 (sometimes it is going to sleep randomly)
+  canControl.FetchStatus();
+
+  if ((canControl.canstat_register & 0b00100000) == 0b00100000)
+  {
+    canControl.ResetController();
+    canControl.FetchStatus(); // check that everything worked
+    if (DEBUG)
+    {
+       Serial.print("MCP2515 went to sleep. CANSTAT reset to: ");
+       Serial.println(canControl.canstat_register);
+    }
+  }
+}
+
 //--------------------------MAIN FUNCTIONS---------------------------//
 void setup() {
   // setup pin I/O
@@ -657,7 +676,7 @@ void setup() {
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
-  if (DEBUG) {
+  if (DEBUG && canControl.errors != 0) {
     Serial.print("Init CAN error: ");
     Serial.println(canControl.errors, HEX);
   }
@@ -676,6 +695,7 @@ void loop() {
   // read GPIO
   readInputs();
 
+  // get any CAN messages that have come in
   canControl.Fetch();
     
   // read CAN
@@ -687,12 +707,10 @@ void loop() {
   // check timers
   checkTimers();
   
-  // check errors
-  checkErrors();
-  
   // process information that was read
   updateState();
 
+  // get any CAN messages that have come in 
   canControl.Fetch();
   
   // write GPIO
@@ -704,39 +722,8 @@ void loop() {
   // clear watchdog timer
   WDT_Restart(WDT);
 
-  //Check the can bus for errors
-  canControl.FetchErrors();
-  
-  // Reset the MCP if we are heading towards a bus_off condition
-  if (canControl.tec > 200 || canControl.rec > 200)
-  {
-    if (DEBUG)
-    {
-      Serial.println("Reseting MCP2515");
-      Serial.print("TEC/REC: ");
-      Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
-    }
-    canControl.ResetController();
-    if (DEBUG)
-    {
-      Serial.println("Reset MCP2515");
-    }
-
-    state.dcErrorFlags |= RESET_MCP2515;
-  }
-  
-  // Check the mode of the MCP2515 (sometimes it is going to sleep randomly)
-  canControl.FetchStatus();
-  if ((canControl.canstat_register & 0b00100000) == 0b00100000)
-  {
-    canControl.ResetController();
-    canControl.FetchStatus(); // check that everything worked
-    if (DEBUG)
-    {
-       Serial.print("MCP2515 went to sleep. CANSTAT reset to: ");
-       Serial.println(canControl.canstat_register);
-    }
-  }
+  // check for errors and fix them
+  checkErrors();
   
   // Add the loop time to the sum time
   if (DEBUG)
@@ -749,7 +736,6 @@ void loop() {
   if (DEBUG && debugTimer.check()) {
       
       /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
-      byte cnf2_spi_read = 0; cnf2_spi_read = canControl.controller.Read(CNF2);
       byte Txstatus[3] = {0,0,0};
       Txstatus[0] = canControl.controller.Read(TXB0CTRL);
       Txstatus[1] = canControl.controller.Read(TXB1CTRL);
@@ -757,8 +743,6 @@ void loop() {
       byte canintf = 0; canintf = canControl.last_interrupt;
       byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
       
-      Serial.print("CNF2: ");
-      Serial.println(cnf2_spi_read,BIN);
       Serial.println("TXnCTRL: ");
       Serial.println(Txstatus[0], BIN);
       Serial.println(Txstatus[1], BIN);
