@@ -46,6 +46,7 @@ const int CC = 11;    //cruise control
 const int LIGHT = 12; //headlights/hazardlights/no lights
 const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
+const int TELM = 0;   //telemetry indicator
 
 //set up pins that connect to switch terminals
 const int fgp =   6;  //forward gear
@@ -72,6 +73,8 @@ Metro display_timer = Metro(500);
 Metro blinking_timer = Metro(500);
 //7th: Debug Timer
 Metro debug_timer = Metro(200);
+//8th: Telemetry HB timer
+Metro telmetry_timer = Metro(2500);
 
 //CAN parameters
 const byte     CAN_CS 	 = 10;
@@ -93,6 +96,7 @@ serLCD_buffered screen(Serial1);
 struct LCD{
   char CCdisplay;        //'C' = cruise control on, ' ' = cruise control off
   char geardisplay;      //'F' = forward, 'R' = reverse, 'N' = neutral
+  char telemetrydisplay; //'T' = telemetry on, ' ' = telemetry off
   String Lightsdisplay;  //"H" = headlights, "HZ" = hazardlights, " " = no lights
   float SOCdisplay;        //state of charge (from CAN)
   float Veldisplay;        //velocity (from CAN)
@@ -229,6 +233,8 @@ inline void defaultdisplay(){
   screen.print(steering_wheel.CCdisplay);
   screen.setCursor(2,GEAR);
   screen.print(steering_wheel.geardisplay);
+  screen.setCursor(2,TELM);
+  screen.print(steering_wheel.telemetrydisplay);
   if(steering_wheel.LTdisplay || steering_wheel.Lightsdisplay=="HZ"){
     blnk(LEFT,steering_wheel.turnsignal_on);
   }
@@ -328,6 +334,11 @@ void loop() {
       notif_timer.reset();
     }
 
+    // Check for Telemetry disconnection
+    if (telmetry_timer.check()){
+      steering_wheel.telemetrydisplay = ' ';
+    }
+
     if((~young & LEFT_TURN)){
       steering_wheel.LTdisplay = true;
     }
@@ -390,6 +401,11 @@ void loop() {
         #endif
         CAN_RX.reset();
         break;
+      }
+      case TELM_HEARTBEAT_ID:
+      {
+        steering_wheel.telemetrydisplay = 'T';
+        telmetry_timer.reset();
       }
     }
   }
