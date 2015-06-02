@@ -63,6 +63,7 @@ const float    MAX_ACCEL_RATIO     = 0.8;     // maximum safe accel ratio
 const uint16_t MAX_REGEN_VOLTAGE   = 1024;    // max possible regen voltage
 const float    MAX_REGEN_RATIO     = 1.0;     // maximum safe regen ratio
 const float    MIN_PEDAL_TOLERANCE = 0.07;    // anything less is basically zero
+const uint8_t  MIN_BRAKE_COUNT     = 10;      // Minimum # of LOW reads on the brake pin it takes to enable the brake state (for de-noising)
 const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
 const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw. (usually 1 since we monitor/limit this on our side, can be used for safety/testing).
@@ -112,6 +113,7 @@ struct CarState {
   // RAW DATA
   // pedals
   bool brakeEngaged;
+  unsigned long brakeCountRaw; // internal counter use for de-noising
   uint16_t regenRaw; // raw voltage reading from regen input
   uint16_t accelRaw; // raw voltage reading from accel input
   
@@ -208,7 +210,19 @@ int loopCount = 0;
  */
 void readInputs() {
   // read brake
-  state.brakeEngaged = (digitalRead(BRAKE_PIN) == LOW);
+  if (digitalRead(BRAKE_PIN) == LOW)
+    state.brakeCountRaw = min(MIN_BRAKE_COUNT, state.brakeCountRaw + 1);
+  else if (!state.brakeEngaged && state.brakeCountRaw >= 1)
+    state.brakeCountRaw--;
+  else 
+    state.brakeCountRaw = 0;
+
+  if (state.brakeCountRaw >= MIN_BRAKE_COUNT)
+    state.brakeEngaged = true;
+  else
+    state.brakeEngaged = false;
+
+  if (state.brakeEngaged) {Serial.print("BRAKE"); Serial.println(state.brakeCountRaw);}
   
   // read accel and regen pedals pedal
   state.accelRaw = analogRead(ACCEL_PIN);
@@ -360,21 +374,21 @@ void updateState() {
       state.gear = NEUTRAL; // can always change to neutral
       break;
     case FORWARD_RAW:
-      if (fabs(state.carVelocity) < GEAR_CHANGE_CUTOFF || 
-          state.carVelocity > 0.0f) { // going forward or velocity less than cutoff, gear switch ok
+      if (state.carVelocity > -GEAR_CHANGE_CUTOFF) { // going forward or velocity less than cutoff, gear switch ok
         state.gear = FORWARD;
       }
       break;
     case REVERSE_RAW:
-      if (fabs(state.carVelocity) < GEAR_CHANGE_CUTOFF ||
-          state.carVelocity < 0.0f) { // going backward or velocity less than cutoff, gear switch ok
+      if (state.carVelocity < GEAR_CHANGE_CUTOFF) { // going backward or velocity less than cutoff, gear switch ok
         state.gear = REVERSE;
       }
       break;
     default: // unknown gear
+    {
       state.gear = NEUTRAL; // safe default gear?
       state.dcErrorFlags |= SW_BAD_GEAR; // flag bad gear
       break;
+    }
     }
   }
   
@@ -754,6 +768,27 @@ void loop() {
       Serial.print("CANSTAT: ");
       Serial.println(state.canstat_reg, BIN);
       Serial.println("");
+
+        Serial.print("Gear: ");
+        switch (state.gear) {
+        case BRAKE:
+          Serial.println("BRAKE");
+          break;
+        case FORWARD:
+          Serial.println("FORWARD");
+          break;
+        case REVERSE:
+          Serial.println("REVERSE");
+          break;
+        case REGEN:
+          Serial.println("REGEN");
+          break;
+        case NEUTRAL:
+          Serial.println("NEUTRAL");
+          break;
+        }
+        Serial.print("Gear Raw: ");
+        Serial.println(state.gearRaw);
       /***************************************************************************/
     
     Serial.print("Average Loop time (us): ");
