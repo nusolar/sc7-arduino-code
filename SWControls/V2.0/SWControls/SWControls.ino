@@ -25,7 +25,7 @@ send other data that we might need in the future between the steering wheel and 
 #define REV_GEAR BIT(1)
 #define HEADLIGHT BIT(2)
 #define HAZARDLIGHT BIT(3)
-#define CRUISE_CONTROL BIT(4)
+//#define LAP_TIMER BIT(4)
 #define HORN BIT(5)
 #define LEFT_TURN BIT(6)
 #define RIGHT_TURN BIT(7)
@@ -39,11 +39,11 @@ char old;          //old is the previous switch states
 #define MPS_TO_MPH 2.2369f
 
 //Steering Wheel LCD Info - the position on the LCD
-const int SOC = 8;    //state of charge (from CAN)
+//const int SOC = 8;    //state of charge (from CAN)
 const int V = 6;      //velocity (from CAN)
 const int GEAR = 13;  //forward/reverse/neutral
-const int CC = 11;    //cruise control
-const int LIGHT = 12; //headlights/hazardlights/no lights
+const int LT = 8;    //lap timer
+const int LIGHT = 11; //headlights/hazardlights/no lights
 const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
 
@@ -52,7 +52,7 @@ const int fgp =   6;  //forward gear
 const int rgp =   7;  //reverse gear
 const int hp =    9;  //headlights
 const int hzp =   8;  //hazardlights
-const int ccp =   4;  //cruise control
+const int laptimerp =   4;  //lap timer reset
 const int hornp = 5; //horn
 const int ltp =   3;  //left turn
 const int rtp =   A2;  //right turn
@@ -83,7 +83,7 @@ uint16_t errors;
 CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); //Try initializing without interrupts for now
 
 //Declaring switch objects (for debouncing, based on the included Switch library)
-Switch cruisecontrol(ccp);
+Switch laptimerreset(laptimerp);
 Switch horn(hornp);
 
 //Declaring serLCD object (display, based on the NUserLCD library)
@@ -91,10 +91,12 @@ serLCD_buffered screen(Serial1);
 
 //setup a display structure to store the shenanigans that we neeed to display on LCD
 struct LCD{
-  char CCdisplay;        //'C' = cruise control on, ' ' = cruise control off
+  char lapdisplay[4];    
+  int lapmindisplay;     //displays the minutes in the lap
+  int lapsecdisplay;     //displays the seconds in the lap
   char geardisplay;      //'F' = forward, 'R' = reverse, 'N' = neutral
   String Lightsdisplay;  //"H" = headlights, "HZ" = hazardlights, " " = no lights
-  float SOCdisplay;        //state of charge (from CAN)
+  //float SOCdisplay;        //state of charge (from CAN)
   float Veldisplay;        //velocity (from CAN)
   boolean LTdisplay;     //distinguishes left turn
   boolean RTdisplay;     //distinguishes right turn
@@ -118,6 +120,8 @@ unsigned long loopStartTime = 0;
 unsigned long loopSumTime = 0;
 unsigned long loopCount = 0;
 
+unsigned long previousmillis = 0;
+
 void setup() {
   
   // Pin Modes
@@ -125,7 +129,7 @@ void setup() {
   pinMode(rgp, INPUT_PULLUP);
   pinMode(hp, INPUT_PULLUP);
   pinMode(hzp, INPUT_PULLUP);
-  pinMode(ccp, INPUT_PULLUP);
+  pinMode(laptimerp, INPUT_PULLUP);
   pinMode(hornp, INPUT_PULLUP);
   pinMode(ltp, INPUT_PULLUP);
   pinMode(rtp, INPUT_PULLUP);
@@ -162,6 +166,9 @@ void setup() {
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
+  
+  steering_wheel.lapmindisplay = 0;
+  steering_wheel.lapsecdisplay = 00;
   
 #ifdef DEBUG
   Serial.print("CANINTE: " );
@@ -216,19 +223,18 @@ inline void blnk(int a, boolean on){
 inline void defaultdisplay(){
   screen.clear();
   screen.setCursor(1,4);
-  screen.print("SOC:  %");
-  screen.setCursor(1,SOC);
-  screen.print(int(steering_wheel.SOCdisplay));
-  screen.setCursor(1,LIGHT);
-  screen.print(steering_wheel.Lightsdisplay);
+  screen.print("LAP ");
+  screen.setCursor(1,LT);
+  sprintf(steering_wheel.lapdisplay,"%d:%02d",steering_wheel.lapmindisplay,steering_wheel.lapsecdisplay);
+  screen.print(steering_wheel.lapdisplay);
+  screen.setCursor(1,GEAR);
+  screen.print(steering_wheel.geardisplay);
   screen.setCursor(2,4);
   screen.print("V:");
   screen.setCursor(2,V);
   screen.print(min(99,int(steering_wheel.Veldisplay)));
-  screen.setCursor(2,CC);
-  screen.print(steering_wheel.CCdisplay);
-  screen.setCursor(2,GEAR);
-  screen.print(steering_wheel.geardisplay);
+  screen.setCursor(2,LIGHT);
+  screen.print(steering_wheel.Lightsdisplay);
   if(steering_wheel.LTdisplay || steering_wheel.Lightsdisplay=="HZ"){
     blnk(LEFT,steering_wheel.turnsignal_on);
   }
@@ -266,15 +272,15 @@ void loop() {
     switchBitFromPin(rtp,  young,RIGHT_TURN);
     
     //poll the cruisecontrol and horn and change value of bit accordingly
-    cruisecontrol.poll();
-    if(cruisecontrol.pushed()){
-      BIT_FLIP(young,CRUISE_CONTROL);
-    }    
+    laptimerreset.poll();
+    if(laptimerreset.pushed()){
+      previousmillis = millis();
+    }
     horn.poll();
     switchBit(!horn.on(), young, HORN);
     switch_timer.reset();
-  }
-
+  }  
+  
   if (old != young || display_timer.check()){
 
     //possibility of switch statements?
@@ -317,7 +323,7 @@ void loop() {
       notif_timer.reset();
     }
 
-    if((~young & CRUISE_CONTROL) && steering_wheel.CCdisplay != 'C'){
+    /*if((~young & CRUISE_CONTROL) && steering_wheel.CCdisplay != 'C'){
       steering_wheel.CCdisplay = 'C';
       steering_wheel.notification = String("CruiseControl on");
       notif_timer.reset();
@@ -326,7 +332,7 @@ void loop() {
       steering_wheel.CCdisplay = ' ';
       steering_wheel.notification = String("CruiseControlOff");
       notif_timer.reset();
-    }
+    }*/
 
     if((~young & LEFT_TURN)){
       steering_wheel.LTdisplay = true;
@@ -344,6 +350,16 @@ void loop() {
     }
     else{
       defaultdisplay();
+    }
+    steering_wheel.lapsecdisplay = (millis() - previousmillis)/1000;
+    if (steering_wheel.lapsecdisplay >= 60)
+    {
+      steering_wheel.lapmindisplay = steering_wheel.lapsecdisplay/60;
+      steering_wheel.lapsecdisplay -= steering_wheel.lapmindisplay*60;
+    }
+    else
+    {
+      steering_wheel.lapmindisplay = 0;
     }
     
     screen.update();
@@ -371,7 +387,7 @@ void loop() {
  #endif
     switch (f.id)
     {
-      case BMS_SOC_ID:
+      /*case BMS_SOC_ID:
       {
         BMS_SOC packet(f); //This is where we get the State of charge
         steering_wheel.SOCdisplay = packet.percent_SOC*100;
@@ -380,7 +396,7 @@ void loop() {
         #endif
         CAN_RX.reset();
         break;
-      }
+      }*/
       case MC_VELOCITY_ID:
       {
         MC_Velocity packet(f); // This is where we get the velocity
@@ -450,7 +466,7 @@ void checkProgrammingMode()
 
 inline void initializePins()
 {
-  steering_wheel.CCdisplay = ' ';
+  //steering_wheel.CCdisplay = ' ';
   
   if(digitalRead(fgp) == LOW){
     steering_wheel.geardisplay = 'F';
