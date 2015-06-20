@@ -46,6 +46,7 @@ const int LT = 8;    //lap timer
 const int LIGHT = 11; //headlights/hazardlights/no lights
 const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
+const int TELM = 0;   //telemetry indicator
 
 //set up pins that connect to switch terminals
 const int fgp =   6;  //forward gear
@@ -72,6 +73,8 @@ Metro display_timer = Metro(500);
 Metro blinking_timer = Metro(500);
 //7th: Debug Timer
 Metro debug_timer = Metro(200);
+//8th: Telemetry HB timer
+Metro telmetry_timer = Metro(2500);
 
 //CAN parameters
 const byte     CAN_CS 	 = 10;
@@ -95,6 +98,7 @@ struct LCD{
   int lapmindisplay;     //displays the minutes in the lap
   int lapsecdisplay;     //displays the seconds in the lap
   char geardisplay;      //'F' = forward, 'R' = reverse, 'N' = neutral
+  char telemetrydisplay; //'T' = telemetry on, ' ' = telemetry off
   String Lightsdisplay;  //"H" = headlights, "HZ" = hazardlights, " " = no lights
   //float SOCdisplay;        //state of charge (from CAN)
   float Veldisplay;        //velocity (from CAN)
@@ -235,6 +239,8 @@ inline void defaultdisplay(){
   screen.print(min(99,int(steering_wheel.Veldisplay)));
   screen.setCursor(2,LIGHT);
   screen.print(steering_wheel.Lightsdisplay);
+  screen.setCursor(2,TELM);
+  screen.print(steering_wheel.telemetrydisplay);
   if(steering_wheel.LTdisplay || steering_wheel.Lightsdisplay=="HZ"){
     blnk(LEFT,steering_wheel.turnsignal_on);
   }
@@ -334,6 +340,11 @@ void loop() {
       notif_timer.reset();
     }*/
 
+    // Check for Telemetry disconnection
+    if (telmetry_timer.check()){
+      steering_wheel.telemetrydisplay = ' ';
+    }
+
     if((~young & LEFT_TURN)){
       steering_wheel.LTdisplay = true;
     }
@@ -406,6 +417,11 @@ void loop() {
         #endif
         CAN_RX.reset();
         break;
+      }
+      case TELM_HEARTBEAT_ID:
+      {
+        steering_wheel.telemetrydisplay = 'T';
+        telmetry_timer.reset();
       }
     }
   }
