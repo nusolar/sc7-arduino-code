@@ -1,7 +1,7 @@
---OUTDATED: 3/16/15--
+--Updated: 7/14/15--
 
 Steering Wheel Controls 
-Version: 1.0
+Version: 2.0
 NUSOLAR 2015
 by Ethan Park
 ########################
@@ -24,7 +24,7 @@ Libraries Used  (location	  ; where to find  )
 ----------------------------------------------------
 Switches 	(Arduino/libraries; included in zip)
 Metro  #39c65de	(Arduino/libraries; NUsolar GitHub )
-serLCD #53d38b8	(Arduino/libraries; NUsolar GitHub )
+serLCD #fcef62d	(Arduino/libraries; NUsolar GitHub )
 SPI		(Built-in)
-sc7-can	v2.0	(C:/NUsolar/sc7-can; NUsolar GitHub)
+sc7-can	v3.0	(C:/NUsolar/sc7-can; NUsolar GitHub)
 avr/wdt.h	(Built-in)
