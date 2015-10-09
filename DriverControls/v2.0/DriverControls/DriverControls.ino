@@ -1,3 +1,5 @@
+#include <CAN_IO.h>
+
 /*
  * DriverControls.ino
  * Contains code to run the driver controls
@@ -8,7 +10,6 @@
 #include <Metro.h>
 #include <SPI.h>
 #include <math.h>
-#include "sc7-can-libinclude.h"
 #include "steering-defs.h"
 
 //------------------------------CONSTANTS----------------------------//
