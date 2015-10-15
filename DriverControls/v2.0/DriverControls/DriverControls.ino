@@ -1,11 +1,10 @@
-#include <CAN_IO.h>
-
 /*
  * DriverControls.ino
  * Contains code to run the driver controls
  * board for sc7.
  */
 
+#include <CAN_IO.h>
 #include <stdint.h>
 #include <Metro.h>
 #include <SPI.h>
@@ -14,8 +13,9 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG = true; // change to true to output debug info over serial
-byte       debugStep = 0; // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
+const bool DEBUG       = true;    // change to true to output debug info over serial
+byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
+const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
 const byte IGNITION_PIN   = 49;
@@ -56,7 +56,6 @@ const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
-const int      SERIAL_BAUD       = 115200;// baudrate for serial (maximum)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -83,7 +82,7 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float MAX_CURRENT_THRESH		      = 68000; // mA
+const float MAX_CURRENT_THRESH		= 68000; // mA
 const float CONTINUOUS_CURRENT_THRESH   = 40000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;    // max number of overcurrent values allowed before trip
@@ -96,6 +95,7 @@ const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
 const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
 const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
+
 //----------------------------TYPE DEFINITIONS------------------------//
 /*
  * Enum to represet the possible gear states.
@@ -151,10 +151,8 @@ struct CarState {
   
   // DERIVED DATA
   // pedals
-  float accelRatio; // ratio of accel voltage to max voltage
-                    // constrained for safety
-  float regenRatio; // ratio of regen voltage to max voltage
-                    // constrained for safety
+  float accelRatio; // ratio of accel voltage to max voltage, constrained for safety
+  float regenRatio; // ratio of regen voltage to max voltage, constrained for safety
                     
   // motor current
   float accelCurrent;   // current to use if in drive/reverse
@@ -222,8 +220,6 @@ void readInputs() {
     state.brakeEngaged = true;
   else
     state.brakeEngaged = false;
-
-  if (state.brakeEngaged) {Serial.print("BRAKE"); Serial.println(state.brakeCountRaw);}
   
   // read accel and regen pedals pedal
   state.accelRaw = analogRead(ACCEL_PIN);
@@ -318,12 +314,9 @@ void readCAN() {
       state.bmsCurrent = packet.current;
       state.updateCurrentBufferRequested = true;
     }
-    /************* MORE DEBUG CODE **********************/
-    else if (DEBUG) 
-    {
+    else if (DEBUG) {
       Serial.print("Unk. Packet: "); Serial.println(frameToString(f));
     }
-    /*****************************************************/
   }
 }
 
@@ -385,11 +378,9 @@ void updateState() {
       }
       break;
     default: // unknown gear
-    {
       state.gear = NEUTRAL; // safe default gear?
       state.dcErrorFlags |= SW_BAD_GEAR; // flag bad gear
       break;
-    }
     }
   }
   
@@ -642,15 +633,14 @@ void setup() {
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
   
-  // init steering wheel inputs for use if we loose the steering wheel
-    pinMode(NEUTRAL_PIN, INPUT_PULLUP);
-    pinMode(REVERSE_PIN, INPUT_PULLUP); 
-    pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
-    pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
-    pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
-    pinMode(HAZARDS_SW_PIN, INPUT_PULLUP);
-    pinMode(HORN_SW_PIN, INPUT_PULLUP);
-
+  // init steering wheel inputs for use if we lose the steering wheel
+  pinMode(NEUTRAL_PIN, INPUT_PULLUP);
+  pinMode(REVERSE_PIN, INPUT_PULLUP); 
+  pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
+  pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
+  pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
+  pinMode(HAZARDS_SW_PIN, INPUT_PULLUP);
+  pinMode(HORN_SW_PIN, INPUT_PULLUP);
 
   digitalWrite(BOARDLED,HIGH); // Turn on durring initialization
   
@@ -749,53 +739,53 @@ void loop() {
   
   // debugging printout
   if (DEBUG && debugTimer.check()) {
-      
-      /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
-      byte Txstatus[3] = {0,0,0};
-      Txstatus[0] = canControl.controller.Read(TXB0CTRL);
-      Txstatus[1] = canControl.controller.Read(TXB1CTRL);
-      Txstatus[2] = canControl.controller.Read(TXB2CTRL);
-      byte canintf = 0; canintf = canControl.last_interrupt;
-      byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
-      
-      Serial.println("TXnCTRL: ");
-      Serial.println(Txstatus[0], BIN);
-      Serial.println(Txstatus[1], BIN);
-      Serial.println(Txstatus[2], BIN);
-      Serial.print("Last Interrupt: ");
-      Serial.println(canintf, BIN);
-      Serial.print("CANCTRL: ");
-      Serial.println(canctrl, BIN);
-      Serial.print("CANSTAT: ");
-      Serial.println(state.canstat_reg, BIN);
-      Serial.println("");
-
-        Serial.print("Gear: ");
-        switch (state.gear) {
-        case BRAKE:
-          Serial.println("BRAKE");
-          break;
-        case FORWARD:
-          Serial.println("FORWARD");
-          break;
-        case REVERSE:
-          Serial.println("REVERSE");
-          break;
-        case REGEN:
-          Serial.println("REGEN");
-          break;
-        case NEUTRAL:
-          Serial.println("NEUTRAL");
-          break;
-        }
-        Serial.print("Gear Raw: ");
-        Serial.println(state.gearRaw);
-      /***************************************************************************/
     
+    /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
+    byte Txstatus[3] = {0,0,0};
+    Txstatus[0] = canControl.controller.Read(TXB0CTRL);
+    Txstatus[1] = canControl.controller.Read(TXB1CTRL);
+    Txstatus[2] = canControl.controller.Read(TXB2CTRL);
+    byte canintf = 0; canintf = canControl.last_interrupt;
+    byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
+    
+    Serial.println("TXnCTRL: ");
+    Serial.println(Txstatus[0], BIN);
+    Serial.println(Txstatus[1], BIN);
+    Serial.println(Txstatus[2], BIN);
+    Serial.print("Last Interrupt: ");
+    Serial.println(canintf, BIN);
+    Serial.print("CANCTRL: ");
+    Serial.println(canctrl, BIN);
+    Serial.print("CANSTAT: ");
+    Serial.println(state.canstat_reg, BIN);
+    Serial.println("");
+
+    Serial.print("Gear: ");
+    switch (state.gear) {
+    case BRAKE:
+      Serial.println("BRAKE");
+      break;
+    case FORWARD:
+      Serial.println("FORWARD");
+      break;
+    case REVERSE:
+      Serial.println("REVERSE");
+      break;
+    case REGEN:
+      Serial.println("REGEN");
+      break;
+    case NEUTRAL:
+      Serial.println("NEUTRAL");
+      break;
+    }
+    Serial.print("Gear Raw: ");
+    Serial.println(state.gearRaw);    
     Serial.print("Average Loop time (us): ");
     Serial.println(loopSumTime / loopCount);
     Serial.print("System time: ");
     Serial.println(millis());
+    Serial.println();
+    
     switch (debugStep)
     {
       case 0:
