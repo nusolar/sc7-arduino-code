@@ -65,7 +65,7 @@ const float    MIN_PEDAL_TOLERANCE = 0.07;    // anything less is basically zero
 const uint8_t  MIN_BRAKE_COUNT     = 10;      // Minimum # of LOW reads on the brake pin it takes to enable the brake state (for de-noising)
 const float    FORWARD_VELOCITY    = 100.0f;  // velocity to use if forward
 const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
-const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw. (usually 1 since we monitor/limit this on our side, can be used for safety/testing).
+const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw
 const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
 const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
 const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CAN packets per loop
@@ -99,7 +99,7 @@ const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
 /*
  * Enum to represet the possible gear states.
  */
-enum GearState { BRAKE = 0x04, FORWARD = 0x08, REVERSE = 0x01, REGEN = 0x0C, NEUTRAL = 0x02 }; //3 bytes (bit values try to match tritium bit positions in the switches bit (see can.h)
+enum GearState { REVERSE = 0x01, FORWARD = 0x02, NEUTRAL = 0x03, BRAKE = 0x04, REGEN = 0x05 };
 
 /*
  * Enum to represent ignition states
@@ -594,7 +594,7 @@ void checkErrors() {
     {
       Serial.println("Reseting MCP2515");
       Serial.print("TEC/REC: ");
-      Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+      Serial.print(canControl.tec); Serial.print(" / "); Serial.println(canControl.rec);
     }
     canControl.ResetController();
     if (DEBUG)
@@ -859,7 +859,7 @@ void loop() {
         Serial.print("CAN error: ");
         Serial.println(canControl.errors, HEX);
         Serial.print("TEC/REC: ");
-        Serial.print(canControl.tec); Serial.print(" \ "); Serial.println(canControl.rec);
+        Serial.print(canControl.tec); Serial.print(" / "); Serial.println(canControl.rec);
         Serial.print("Interrupt Counter: ");
         Serial.println(canControl.int_counter);
         Serial.print("RX buffer counter: ");
