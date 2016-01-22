@@ -13,7 +13,6 @@
 //------------------------------CONSTANTS----------------------------//
 // debugging
 const bool DEBUG       = true;    // change to true to output debug info over serial
-byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
@@ -81,10 +80,10 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float MAX_CURRENT_THRESH    = 68000; // mA
+const float MAX_CURRENT_THRESH          = 68000; // mA
 const float CONTINUOUS_CURRENT_THRESH   = 40000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
-const int   OVERCURRENTS_ALLOWED        = 7;    // max number of overcurrent values allowed before trip
+const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
 
 
 // driver control errors
@@ -163,9 +162,9 @@ struct CarState {
   //float cruiseCtrlRatio; // pedal ratio to use if cruise control active
                     
   // gearing and ignition
-  GearState gear;               // brake, foward, reverse, regen, neutral
+  GearState gear;         // brake, foward, reverse, regen, neutral
   IgnitionState ignition; // start, run, park
-  bool tripped;                 // flag for overcurrent  
+  bool tripped;           // flag for overcurrent  
   
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
@@ -196,7 +195,8 @@ Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 
-// Timing debugging variables.
+// debugging variables
+byte debugStep   = 0;       // split serial out into 3 steps
 long loopStartTime = 0;
 long loopSumTime = 0;
 int loopCount = 0;
@@ -588,17 +588,14 @@ void checkErrors() {
   canControl.FetchErrors();
   
   // Reset the MCP if we are heading towards a bus_off condition
-  if (canControl.tec > 200 || canControl.rec > 200)
-  {
-    if (DEBUG)
-    {
+  if (canControl.tec > 200 || canControl.rec > 200) {
+    if (DEBUG) {
       Serial.println("Reseting MCP2515");
       Serial.print("TEC/REC: ");
       Serial.print(canControl.tec); Serial.print(" / "); Serial.println(canControl.rec);
     }
     canControl.ResetController();
-    if (DEBUG)
-    {
+    if (DEBUG) {
       Serial.println("Reset MCP2515");
     }
 
@@ -608,12 +605,10 @@ void checkErrors() {
   // Check the mode of the MCP2515 (sometimes it is going to sleep randomly)
   canControl.FetchStatus();
 
-  if ((canControl.canstat_register & 0b00100000) == 0b00100000)
-  {
+  if ((canControl.canstat_register & 0b00100000) == 0b00100000) {
     canControl.ResetController();
     canControl.FetchStatus(); // check that everything worked
-    if (DEBUG)
-    {
+    if (DEBUG) {
        Serial.print("MCP2515 went to sleep. CANSTAT reset to: ");
        Serial.println(canControl.canstat_register);
     }
@@ -688,8 +683,7 @@ void setup() {
 
 void loop() {
   // Start timer
-  if (DEBUG)
-  {
+  if (DEBUG) {
     loopStartTime = micros();
   }
   
@@ -730,8 +724,7 @@ void loop() {
   checkErrors();
   
   // Add the loop time to the sum time
-  if (DEBUG)
-  { 
+  if (DEBUG) { 
     loopSumTime += micros() - loopStartTime;
     loopCount += 1;
   }
@@ -785,8 +778,7 @@ void loop() {
     Serial.println(millis());
     Serial.println();
     
-    switch (debugStep)
-    {
+    switch (debugStep) {
       case 0:
         Serial.print("Brake pin: ");
         Serial.println(state.brakeEngaged ? "pressed" : "not pressed");
@@ -824,8 +816,7 @@ void loop() {
         Serial.println(state.gearRaw);
         Serial.print("Car tripped: ");
         Serial.println(state.tripped ? "YES" : "NO");
-      break;
-      ///////////////////
+        break;
       case 1:
         Serial.print("Ignition: ");
         Serial.println(state.ignition,HEX);
@@ -845,8 +836,7 @@ void loop() {
         Serial.println(state.leftTurnOn ? "YES" : "NO");
         Serial.print("Hazards: ");
         Serial.println(state.hazards ? "YES" : "NO");
-      break;
-      ////////////////////
+        break;
       case 2: 
         //Serial.print("Cruise control: ");
         //Serial.println(state.cruiseCtrl ? "ON" : "OFF");
@@ -868,12 +858,11 @@ void loop() {
         Serial.println(state.dcErrorFlags, HEX);
         Serial.print("BMS Current: ");
         Serial.println(state.bmsCurrent);
-        if (state.SW_timer_reset_by != 0)
-         {
-           Serial.print("SW RESET BY: ");
-           Serial.println(state.SW_timer_reset_by, HEX);
-           state.SW_timer_reset_by = 0;
-         }
+        if (state.SW_timer_reset_by != 0) {
+          Serial.print("SW RESET BY: ");
+          Serial.println(state.SW_timer_reset_by, HEX);
+          state.SW_timer_reset_by = 0;
+        }
         break;
     }
     
