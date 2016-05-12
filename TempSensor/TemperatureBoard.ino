@@ -52,14 +52,16 @@ void loop() {
         
         float prev_resistance = resistances[decimal];
         //for (int n = 0; n < 4; n++) {
-        int n = 2;
+        int n = 3;
           int analogSignal = analogRead(n);
           float voltage = analogSignal * (3.3 / 1023.0);
           float current = voltage / 10000.0;
           float resistance = (3.3 - voltage) / current;
           float diff = resistance - prev_resistance;
           resistances[decimal] = resistance;
-            Serial.print("Mux in: ");
+            Serial.print("n: ");
+            Serial.print(n);
+            Serial.print(" Mux in: ");
             //Serial.print(bit1);
             //Serial.print(bit2);
             //Serial.print(bit3);
