@@ -53,7 +53,7 @@ const int fgp =   6;  //forward gear
 const int rgp =   7;  //reverse gear
 const int hp =    9;  //headlights
 const int hzp =   8;  //hazardlights
-const int laptimerp =   4;  //lap timer reset
+const int laptimerp =   A1;  //lap timer reset
 const int hornp = 5; //horn
 const int ltp =   3;  //left turn
 const int rtp =   A2;  //right turn
@@ -196,7 +196,7 @@ inline void switchBit(bool b, char& out, byte mask) {
 }
 
 //blink function used for the turn signals
-inline void blnk(int a, boolean on){
+void blnk(int a, boolean on){
   if (on)
   {
     screen.setCursor(1,a);
@@ -233,7 +233,7 @@ inline void defaultdisplay(){
   screen.print(steering_wheel.lapdisplay);
   screen.setCursor(1,GEAR);
   screen.print(steering_wheel.geardisplay);
-  screen.setCursor(2,4);
+  screen.setCursor(2,V-2);
   screen.print("V:");
   screen.setCursor(2,V);
   screen.print(min(99,int(steering_wheel.Veldisplay)));
@@ -259,16 +259,18 @@ inline void displayNotification(){
 }
 
 
-void loop() {  
+void loop() {
+  /*Measure the length of the loop in debug mode.*/  
   #ifdef DEBUG
     loopStartTime = micros();
   #endif
   
-  wdt_reset();
-  old = young;
+  wdt_reset(); //watch dog timer reset
+  
+  old = young; //transfer from switch mode from new ones to old variable
   
   /*if the metro timer runs out, then check the states of all the switches
-   assign the values to the 'young' byte. Reset switch timer.*/
+   assign the values to the 'young' variable. Reset switch timer.*/
   if (switch_timer.check()){
     switchBitFromPin(fgp,  young,FWD_GEAR);
     switchBitFromPin(rgp,  young,REV_GEAR);
@@ -277,7 +279,7 @@ void loop() {
     switchBitFromPin(ltp,  young,LEFT_TURN);
     switchBitFromPin(rtp,  young,RIGHT_TURN);
     
-    //poll the cruisecontrol and horn and change value of bit accordingly
+    //poll the laptimer and horn and change value of bit accordingly
     laptimerreset.poll();
     if(laptimerreset.pushed()){
       previousmillis = millis();
@@ -286,7 +288,8 @@ void loop() {
     switchBit(!horn.on(), young, HORN);
     switch_timer.reset();
   }  
-  
+
+  /* if switch state changes, or timer runs out, update the screen*/
   if (old != young || display_timer.check()){
 
     //possibility of switch statements?
@@ -355,6 +358,7 @@ void loop() {
     }
     else steering_wheel.RTdisplay = false;
 
+
     if (notif_timer.running()){
       defaultdisplay();
       displayNotification();
@@ -362,6 +366,7 @@ void loop() {
     else{
       defaultdisplay();
     }
+    
     steering_wheel.lapsecdisplay = (millis() - previousmillis)/1000;
     if (steering_wheel.lapsecdisplay >= 60)
     {
@@ -454,6 +459,12 @@ void loop() {
       Serial.println(loopSumTime/loopCount);
       Serial.print("System time: ");
       Serial.println(millis());
+      Serial.print("Laptime: ");
+      Serial.println(steering_wheel.lapmindisplay); Serial.println(steering_wheel.lapsecdisplay);
+      Serial.print("Turn signal: ");
+      Serial.println(steering_wheel.turnsignal_on);
+      Serial.println(screen.getBuffer());
+
       
       loopSumTime = 0;
       loopCount = 0;
