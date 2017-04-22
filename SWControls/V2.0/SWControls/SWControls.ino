@@ -1,4 +1,4 @@
-#include "sc7-can-libinclude.h"
+#include <CAN_IO.h>
 #include <Metro.h>
 #include <Switch.h>
 #include <serLCD.h>
@@ -141,7 +141,7 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
-  delay(500); // Allow MCP2515 to run for 128 cycles and LCD to boot
+  delay(1000); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
