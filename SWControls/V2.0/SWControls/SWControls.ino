@@ -383,7 +383,7 @@ void loop() {
 
   //If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packet and reset CAN_TX timer.
   if(young != old || CAN_TX.check()){
-    CanControl.Send(SW_Data(young),TXB0);
+    CanControl.Send(SW_Data(young,0),TXB0);
     CAN_TX.reset();
   }
 
@@ -423,7 +423,7 @@ void loop() {
         CAN_RX.reset();
         break;
       }
-      case TELM_HEARTBEAT_ID:
+      case TEL_HEARTBEAT_ID:
       {
         steering_wheel.telemetrydisplay = 'T';
         telmetry_timer.reset();
