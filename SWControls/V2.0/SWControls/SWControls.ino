@@ -9,6 +9,8 @@
 //#define LOOPBACK
 #define DEBUG
 
+#define NOTSENDCAN
+
 /*Defining the bitwise functions (bitwise operators)
 We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
 We can store all of the necessary data in a single byte and save space. This frees up space to
@@ -382,10 +384,13 @@ void loop() {
   }
 
   //If this byte is different from the one in the void setup() or the CAN_TX timer runs out, send CAN packet and reset CAN_TX timer.
+  #ifndef NOTSENDCAN 
   if(young != old || CAN_TX.check()){
-    CanControl.Send(SW_Data(young,0),TXB0);
+    CanControl.Send(SW_Data(young,0),TXBANY);
+    Serial.print("Send Can");
     CAN_TX.reset();
   }
+  #endif
 
   wdt_reset();
 
