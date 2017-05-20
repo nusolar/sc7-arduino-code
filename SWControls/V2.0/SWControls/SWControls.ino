@@ -143,7 +143,7 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
-  delay(1000); // Allow MCP2515 to run for 128 cycles and LCD to boot
+  delay(3000); // Allow MCP2515 to run for 128 cycles and LCD to boot
 
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
