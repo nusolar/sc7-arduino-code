@@ -197,7 +197,6 @@ Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 
 // debugging variables
-byte debugStep   = 0;       // split serial out into 3 steps
 long loopStartTime = 0;
 long loopSumTime = 0;
 int loopCount = 0;
