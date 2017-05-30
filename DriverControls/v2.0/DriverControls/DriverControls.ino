@@ -4,15 +4,16 @@
  * board for sc7.
  */
 
+#include <CAN_IO.h>
 #include <stdint.h>
 #include <Metro.h>
 #include <SPI.h>
-#include "sc7-can-libinclude.h"
 #include "steering-defs.h"
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
 const bool DEBUG       = true;    // change to true to output debug info over serial
+byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
@@ -80,7 +81,7 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float MAX_CURRENT_THRESH          = 68000; // mA
+const float MAX_CURRENT_THRESH		= 68000; // mA
 const float CONTINUOUS_CURRENT_THRESH   = 50000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
