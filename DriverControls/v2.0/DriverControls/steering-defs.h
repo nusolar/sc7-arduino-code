@@ -10,7 +10,7 @@
 
 // gearing
 const byte NEUTRAL_PIN = 45;
-const byte REVERSE_PIN = 47;
+const byte FORWARD_PIN = 47;
 
 // lights
 const byte LEFT_TURN_SW_PIN    = 0;

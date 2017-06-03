@@ -143,8 +143,8 @@ void setup() {
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
   screen.begin();
-  delay(3000); // Allow MCP2515 to run for 128 cycles and LCD to boot
-
+  delay(3000); // Allow LCD and MCP2515 to fully boot (screen seems to have issues if you don't pause for more than 3000 ms).
+  
   /*
    * PRO MICRO MUST BE PUT INTO PROGRAMMING MODE BEFORE
    * PROGRAMMING BY SETTING HAZARD/HEADLIGHT SWITCH TO
@@ -153,6 +153,7 @@ void setup() {
 
   // Initialize the pin states
   initializePins();
+
   /*
    * CAN Setup
    * Configure RB0 to take SOC and Velocity packets for the display.

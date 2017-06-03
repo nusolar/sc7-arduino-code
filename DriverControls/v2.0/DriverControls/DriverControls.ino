@@ -4,19 +4,20 @@
  * board for sc7.
  */
 
+#include <CAN_IO.h>
 #include <stdint.h>
 #include <Metro.h>
 #include <SPI.h>
-#include "sc7-can-libinclude.h"
 #include "steering-defs.h"
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
 const bool DEBUG       = true;    // change to true to output debug info over serial
+byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
-const byte IGNITION_PIN   = 49;
+const byte IGNITION_PIN    = 52;
 const byte BRAKE_PIN      = 9;
 const byte ACCEL_PIN      = A0;
 const byte REGEN_PIN      = A1;
@@ -80,8 +81,8 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float MAX_CURRENT_THRESH          = 68000; // mA
-const float CONTINUOUS_CURRENT_THRESH   = 40000; // current may exceed this value no more than 7 times in 50 ms
+const float MAX_CURRENT_THRESH		= 68000; // mA
+const float CONTINUOUS_CURRENT_THRESH   = 50000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
 
@@ -101,7 +102,7 @@ const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
 enum GearState { REVERSE = 0x01, FORWARD = 0x02, NEUTRAL = 0x03, BRAKE = 0x04, REGEN = 0x05 };
 
 /*
- * Enum to represent ignition states
+ * Enum to represent   states
  */
 enum IgnitionState { Ignition_Start = 0x0040, Ignition_Run = 0x0020, Ignition_Park = 0x0010 };
 
@@ -196,7 +197,6 @@ Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 
 // debugging variables
-byte debugStep   = 0;       // split serial out into 3 steps
 long loopStartTime = 0;
 long loopSumTime = 0;
 int loopCount = 0;
@@ -232,16 +232,16 @@ void readInputs() {
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
     // read gear
-    bool rear_on = (digitalRead(REVERSE_PIN) == LOW);
+    bool forward_on = (digitalRead(FORWARD_PIN) == LOW);
     bool neutral_on = (digitalRead(NEUTRAL_PIN) == LOW);
     if (neutral_on) {
       state.gearRaw = NEUTRAL_RAW;
     }
-    else if (rear_on) {
-      state.gearRaw = REVERSE_RAW;
+    else if (forward_on) {
+      state.gearRaw = FORWARD_RAW;
     }
     else {
-      state.gearRaw = FORWARD_RAW;
+      state.gearRaw = REVERSE_RAW;
     }
     
     // read lights
@@ -538,6 +538,9 @@ void writeCAN() {
     
     // create and send packet
     bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
+
+    //Serial.println("Sending DC_Drive: ");
+    //Serial.print(trysend);
     
     // reset timer
     if (trysend) 
@@ -557,13 +560,20 @@ void writeCAN() {
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.check()) {
     // create and send packet
-    DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
+    /*DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
                             state.gear, state.ignition);
-                            
-    bool trysend = canControl.SendVerified(packet, TXBANY);
-    
+                        
+    bool trysend = canControl.Send(packet, TXBANY);*/
+
+    bool trysend = canControl.SendVerified(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged, state.canErrorFlags, state.dcErrorFlags, state.wasReset,
+                                            ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition),
+                                    TXBANY);
+
+    //Serial.println("Sending DC_Info: ");
+    //Serial.print(trysend);
+
     // reset timer
     if (trysend) 
       dcInfoTimer.reset();
@@ -629,7 +639,7 @@ void setup() {
   
   // init steering wheel inputs for use if we lose the steering wheel
   pinMode(NEUTRAL_PIN, INPUT_PULLUP);
-  pinMode(REVERSE_PIN, INPUT_PULLUP); 
+  pinMode(FORWARD_PIN, INPUT_PULLUP); 
   pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
@@ -643,6 +653,7 @@ void setup() {
     Serial.begin(SERIAL_BAUD);
     Serial.println("Serial Initialized");
   }
+  Serial.begin(SERIAL_BAUD);
   
   // init car state
   state = {}; // init all members to 0
@@ -672,6 +683,10 @@ void setup() {
   canControl.filters.setRB0(RXM0, RXF0, RXF1);
   canControl.filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5);
   canControl.Setup(RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
+  
+  //Enabling One-Shot mode (debugging)
+  //canControl.controller.Write(CANCTRL, 00001111);
+  //Serial.println((canControl.controller.Read(CANCTRL)), BIN);
  
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
@@ -739,7 +754,7 @@ void loop() {
     Txstatus[2] = canControl.controller.Read(TXB2CTRL);
     byte canintf = 0; canintf = canControl.last_interrupt;
     byte canctrl = 0; canctrl = canControl.controller.Read(CANCTRL);
-    
+
     Serial.println("TXnCTRL: ");
     Serial.println(Txstatus[0], BIN);
     Serial.println(Txstatus[1], BIN);
