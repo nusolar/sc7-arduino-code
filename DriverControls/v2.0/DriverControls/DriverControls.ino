@@ -96,7 +96,7 @@ const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
 const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
 const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
 
-//temp sensor
+//temp sensor object
 OneWire ds(50);
 
 //----------------------------TYPE DEFINITIONS------------------------//
@@ -423,8 +423,7 @@ void updateState() {
     }
   }
 
-  //check temp sensors
-  tempsensor();
+  // Trip if temp sensors are overtemp
   if(state.celsius >= MAX_TEMP){
     state.tripped = true;
   }
@@ -639,30 +638,23 @@ void checkErrors() {
   }
 }
 
-void tempsensor() {
+void ReadTempSensor() {
   byte i;
   byte present = 0;
   byte type_s;
   byte data[12];
   byte addr[8];
-  float func_celsius, func_fahrenheit;
   
   if ( !ds.search(addr)) {
-    Serial.println("No more addresses.");
+    //Serial.println("No more addresses.");
     //Serial.println();
     ds.reset_search();
-    delay(250);
+    //delay(250);
     return;
   }
-  
-  /*Serial.print("ROM =");
-  for( i = 0; i < 8; i++) {
-    Serial.write(' ');
-    Serial.print(addr[i], HEX);
-  }*/
 
   if (OneWire::crc8(addr, 7) != addr[7]) {
-      Serial.println("CRC is not valid!");
+      //Serial.println("CRC is not valid!");
       return;
   }
   //Serial.println();
@@ -670,19 +662,19 @@ void tempsensor() {
   // the first ROM byte indicates which chip
   switch (addr[0]) {
     case 0x10:
-      Serial.println("  Chip = DS18S20");  // or old DS1820
+      //Serial.println("  Chip = DS18S20");  // or old DS1820
       type_s = 1;
       break;
     case 0x28:
-      Serial.println("  Chip = DS18B20");
+      //Serial.println("  Chip = DS18B20");
       type_s = 0;
       break;
     case 0x22:
-      Serial.println("  Chip = DS1822");
+      //Serial.println("  Chip = DS1822");
       type_s = 0;
       break;
     default:
-      Serial.println("Device is not a DS18x20 family device.");
+      //Serial.println("Device is not a DS18x20 family device.");
       return;
   } 
 
@@ -690,7 +682,7 @@ void tempsensor() {
   ds.select(addr);
   ds.write(0x44, 1);        // start conversion, with parasite power on at the end
   
-  delay(1000);     // maybe 750ms is enough, maybe not
+  //delay(1000);     // maybe 750ms is enough, maybe not
   // we might do a ds.depower() here, but the reset will take care of it.
   
   present = ds.reset();
@@ -702,8 +694,8 @@ void tempsensor() {
   //Serial.print(" ");
   for ( i = 0; i < 9; i++) {           // we need 9 bytes
     data[i] = ds.read();
-    Serial.print(data[i], HEX);
-    Serial.print(" ");
+    //Serial.print(data[i], HEX);
+    //Serial.print(" ");
   }
   //Serial.print(" CRC=");
   //Serial.print(OneWire::crc8(data, 8), HEX);
@@ -728,15 +720,8 @@ void tempsensor() {
     else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
     //// default is 12 bit resolution, 750 ms conversion time
   }
-  func_celsius = (float)raw / 16.0;
-  func_fahrenheit = func_celsius * 1.8 + 32.0;
-  state.celsius = func_celsius;
-  state.fahrenheit = func_fahrenheit;
-  Serial.print("  Temperature = ");
-  Serial.print(func_celsius);
-  Serial.print(" Celsius, ");
-  Serial.print(func_fahrenheit);
-  Serial.println(" Fahrenheit");
+  state.celsius = (float)raw / 16.0;
+  state.fahrenheit = state.celsius * 1.8 + 32.0;
 }
 
 //--------------------------MAIN FUNCTIONS---------------------------//
@@ -821,6 +806,9 @@ void loop() {
   
   // read GPIO
   readInputs();
+
+  // read Tempsensors
+  ReadTempSensor();
 
   // get any CAN messages that have come in
   canControl.Fetch();
@@ -923,26 +911,6 @@ void loop() {
         Serial.println(state.regenRatio);
         Serial.print("Regen current: ");
         Serial.println(state.regenCurrent);
-        Serial.print("Gear: ");
-        switch (state.gear) {
-        case BRAKE:
-          Serial.println("BRAKE");
-          break;
-        case FORWARD:
-          Serial.println("FORWARD");
-          break;
-        case REVERSE:
-          Serial.println("REVERSE");
-          break;
-        case REGEN:
-          Serial.println("REGEN");
-          break;
-        case NEUTRAL:
-          Serial.println("NEUTRAL");
-          break;
-        }
-        Serial.print("Gear Raw: ");
-        Serial.println(state.gearRaw);
         Serial.print("Car tripped: ");
         Serial.println(state.tripped ? "YES" : "NO");
         break;
@@ -993,13 +961,20 @@ void loop() {
           state.SW_timer_reset_by = 0;
         }
         break;
+        case 3:
+          Serial.print("Temperature = ");
+          Serial.print(state.celsius);
+          Serial.print(" Celsius, ");
+          Serial.print(state.fahrenheit);
+          Serial.println(" Fahrenheit");
+         break;
     }
     
     Serial.print("System time: ");
     Serial.println(millis());
     Serial.println();
     
-    debugStep = (debugStep+1) % 3;
+    debugStep = (debugStep+1) % 4;
     debugTimer.reset();
     
     // Reset loop timer variables
