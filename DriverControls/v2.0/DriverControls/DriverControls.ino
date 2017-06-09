@@ -56,6 +56,7 @@ const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
+const uint16_t TEMP_INTERVAL     = 750;   // interval for temp sense updating
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -203,6 +204,7 @@ Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
+Metro tempSenseTimer(TEMP_INTERVAL);   // timer for updating temp sensor array
 
 // debugging variables
 long loopStartTime = 0;
