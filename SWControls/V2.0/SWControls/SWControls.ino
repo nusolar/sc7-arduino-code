@@ -50,6 +50,15 @@ const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
 const int TELM = 0;   //telemetry indicator
 
+//BMS Error Strings
+#define BMS_12VERR_STR              String("TRIP: 12V ERR")
+#define BMS_DRIVECONTROLSERR_STR    String("TRIP: DCTRLS ERR")
+#define BMS_CONTACTERR_STR          String("TRIP: CNTCR ERR")
+#define BMS_CURRENTERR_STR          String("TRIP: OVERCURRENT") // This currently doesn't do anything since the BMS doesn't report current trips
+#define BMS_OVVOLTAGE_STR           String("TRIP: OVER V")
+#define BMS_UNVOLTAGE_STR           String("TRIP: UNDER V")
+#define BMS_UNKERR_STR              String("TRIP: UNK. ERR")
+
 //set up pins that connect to switch terminals
 const int fgp =   6;  //forward gear
 const int rgp =   7;  //reverse gear
@@ -426,6 +435,15 @@ void loop() {
         #ifdef DEBUG
           Serial.print(steering_wheel.Veldisplay);
         #endif
+        CAN_RX.reset();
+        break;
+      }
+      case BMS_STATUS_EXT_ID:
+      {
+        BMS_Status_Ext packet(f); // extract the flags
+        if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); steering_wheel.notification = BMS_OVVOLTAGE_STR;}
+        else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); steering_wheel.notification = BMS_UNVOLTAGE_STR;}
+        else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); steering_wheel.notification = BMS_12VERR_STR;}
         CAN_RX.reset();
         break;
       }
