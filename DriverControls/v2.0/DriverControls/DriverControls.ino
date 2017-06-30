@@ -731,6 +731,7 @@ else
     if (tempCount==26)
     {
         tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
+        state.maxTemp=0;
     }
     
   }
