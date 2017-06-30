@@ -181,8 +181,10 @@ struct CarState {
   uint16_t dcErrorFlags;  // keep track of other errors
 
   //temperature
-  float celsius;
-  float fahrenheit;
+  float celsius[26];
+  float fahrenheit[26];
+  float maxTemp;
+  float avgTemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -212,8 +214,13 @@ long loopSumTime = 0;
 int loopCount = 0;
 
 //temp sense
-bool  conv;         // true if the temp sensors should convert temp instead of read
+bool conv;         // true if the temp sensors should convert temp instead of read
+byte tempCount;    // keeps track of how many times readTempSensor() has run
 byte addr[8];
+
+byte i;            // just used as a counter variable to print out ALL temperatures in the serial debug section
+float avg;         // contains the average temperature
+float sum;         // temporarily stores sum of all temps when computing avg
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -429,7 +436,7 @@ void updateState() {
   }
 
   // Trip if temp sensors are overtemp
-  if(state.celsius >= MAX_TEMP){
+  if(state.maxTemp >= MAX_TEMP){
     state.tripped = true;
   }
   
@@ -644,6 +651,7 @@ void checkErrors() {
 }
 
 void ReadTempSensor() {
+ 
   byte i;
   byte present = 0;
   byte type_s;
@@ -651,6 +659,17 @@ void ReadTempSensor() {
   
   type_s=0;  //we're only using DS18B20 devices (as opposed to other OneWire devices)
 
+
+   if ( !ds.search(addr)) {
+    ds.reset_search();
+    //Serial.print("no more addresses");
+     }
+
+  if (OneWire::crc8(addr, 7) != addr[7]) {
+      //Serial.println("CRC is not valid!");
+      return;
+  }
+  
 if (conv==true)
   {
     ds.reset();                  
@@ -696,12 +715,27 @@ else
       else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
       //// default is 12 bit resolution, 750 ms conversion time
    }
-    state.celsius = (float)raw / 16.0;
-    state.fahrenheit = state.celsius * 1.8 + 32.0;
 
-    conv=true;
+    
+    state.celsius[tempCount] = (float)raw / 16.0;
+    state.fahrenheit[tempCount] = state.celsius[tempCount] * 1.8 + 32.0;
+
+    if (state.celsius[tempCount] > state.maxTemp)
+    {
+      state.maxTemp=state.celsius[tempCount];       //keep the maxTemp value updated
+    }
+    
+    conv=true;  //next time ReadTempSensor runs, it should tell the sensors to convert instead of reading
+    tempCount++;
+    
+    if (tempCount==26)
+    {
+        tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
+    }
+    
   }
 
+ 
 
   
 }
@@ -776,16 +810,7 @@ void setup() {
     Serial.println(canControl.errors, HEX);
   }
 
-  //Collect temp sensor addresses
 
-    if ( !ds.search(addr)) {
-    ds.reset_search();
-     }
-
-  if (OneWire::crc8(addr, 7) != addr[7]) {
-      //Serial.println("CRC is not valid!");
-      return;
-  }
 }
 
 void loop() {
@@ -955,11 +980,26 @@ void loop() {
         }
         break;
         case 3:
-          Serial.print("Temperature = ");
-          Serial.print(state.celsius);
-          Serial.print(" Celsius, ");
-          Serial.print(state.fahrenheit);
-          Serial.println(" Fahrenheit");
+            for (i = 0; i < 26; i++)
+            {
+               Serial.print("Temperature = ");
+               Serial.print(state.celsius[i]);
+               Serial.print(" Celsius, ");
+               Serial.print(state.fahrenheit[i]);
+               Serial.println(" Fahrenheit");
+            }
+            //Calculate Average Temperature  //
+            for (i = 0; i < 26; i++)
+            {
+              sum=sum + state.celsius[i];
+            }
+            state.avgTemp=sum/26;
+            sum=0;
+            Serial.print("Average Temp: ");
+            Serial.println(state.avgTemp);
+            Serial.print("Max Temp: ");
+            Serial.println(state.maxTemp);
+         
          break;
     }
     
