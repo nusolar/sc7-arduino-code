@@ -56,7 +56,7 @@ const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
-const uint16_t TEMP_INTERVAL     = 750;   // interval for temp sense updating
+const uint16_t TEMP_INTERVAL     = 100;   // interval for temp sense updating
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -214,7 +214,6 @@ long loopSumTime = 0;
 int loopCount = 0;
 
 //temp sense
-bool conv;         // true if the temp sensors should convert temp instead of read
 byte tempCount;    // keeps track of how many times readTempSensor() has run
 byte addr[8];
 
@@ -357,6 +356,10 @@ void checkTimers() {
   // check steering wheel
   if (swHbTimer.check()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
+  }
+
+  if (tempSenseTimer.check()) { // temp sensor timeout
+    ReadTempSensor();
   }
 }
 
@@ -670,12 +673,12 @@ void ReadTempSensor() {
       return;
   }
   
-if (conv==true)
+if (tempCount==0)
   {
     ds.reset();                  
-    ds.skip();                       // tell all sensors on bus
+    ds.skip();                   // tell all sensors on bus
     ds.write(0x44,0);            // to convert temperature
-    conv=false;
+    tempCount++;
   }
 else
   {
@@ -717,18 +720,17 @@ else
    }
 
     
-    state.celsius[tempCount] = (float)raw / 16.0;
-    state.fahrenheit[tempCount] = state.celsius[tempCount] * 1.8 + 32.0;
+    state.celsius[tempCount-1] = (float)raw / 16.0;
+    state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
 
-    if (state.celsius[tempCount] > state.maxTemp)
+    if (state.celsius[tempCount-1] > state.maxTemp)
     {
-      state.maxTemp=state.celsius[tempCount];       //keep the maxTemp value updated
+      state.maxTemp=state.celsius[tempCount-1];       //keep the maxTemp value updated
     }
     
-    conv=true;  //next time ReadTempSensor runs, it should tell the sensors to convert instead of reading
     tempCount++;
     
-    if (tempCount==26)
+    if (tempCount==27)
     {
         tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
         state.maxTemp=0;
@@ -825,9 +827,6 @@ void loop() {
   
   // read GPIO
   readInputs();
-
-  // read Tempsensors
-  ReadTempSensor();
 
   // get any CAN messages that have come in
   canControl.Fetch();
@@ -936,6 +935,10 @@ void loop() {
       case 1:
         Serial.print("Ignition: ");
         Serial.println(state.ignition,HEX);
+        Serial.print("IgnitionRaw: ");
+        Serial.println(state.ignitionRaw,HEX);
+        Serial.print("Ignition digitalRead: ");
+        Serial.println(digitalRead(52));
         Serial.print("Horn: ");
         Serial.println(state.horn ? "ON" : "OFF");
         Serial.print("Headlights: ");
