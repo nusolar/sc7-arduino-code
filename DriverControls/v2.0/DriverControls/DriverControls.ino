@@ -18,7 +18,7 @@ byte       debugStep   = 0;       // It's too slow to send out all the debug ove
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
-const byte IGNITION_PIN    = 52;
+const byte IGNITION_PIN   = 52;
 const byte BRAKE_PIN      = 9;
 const byte ACCEL_PIN      = A0;
 const byte REGEN_PIN      = A1;
@@ -56,6 +56,10 @@ const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
+const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
+const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
+
+
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -73,7 +77,8 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
-const float    MAX_TEMP            = 60.0;    // absolute max battery temp in celsius
+const float    CHARGE_TEMP         = 45.0;    // battery temp threshold when current is positive
+const float    DISCHARGE_TEMP      = 60.0;    // battery temp threshold when current is negative
 
 // steering wheel parameters
 const byte NEUTRAL_RAW = 0x03;
@@ -180,8 +185,10 @@ struct CarState {
   uint16_t dcErrorFlags;  // keep track of other errors
 
   //temperature
-  float celsius;
-  float fahrenheit;
+  float celsius[26];
+  float fahrenheit[26];
+  float maxTemp;
+  float avgTemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -203,12 +210,20 @@ Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
+Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
+Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
 
 // debugging variables
 long loopStartTime = 0;
 long loopSumTime = 0;
 int loopCount = 0;
 
+//temp sense
+byte tempCount;    // keeps track of how many times readTempSensor() has run
+byte addr[8];
+
+byte i;            // just used as a counter variable to print out ALL temperatures in the serial debug section
+float j;         // used as a counter when calculating Avg and Max temperatures
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -236,6 +251,7 @@ void readInputs() {
   
   // read ignition switch
   state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
+  digitalWrite(BOARDLED,digitalRead(IGNITION_PIN));
   
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
@@ -333,19 +349,20 @@ void readCAN() {
  */
 void checkTimers() {
   // check motor controller
-  if (mcHbTimer.check()) { // motor controller timeout
+  if (mcHbTimer.expired()) { // motor controller timeout
     state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
   
   // check bms
-  if (bmsHbTimer.check()) { // bms timeout
+  if (bmsHbTimer.expired()) { // bms timeout
     state.dcErrorFlags |= BMS_TIMEOUT; // set flag
   }
   
   // check steering wheel
-  if (swHbTimer.check()) { // steering wheel timeout
+  if (swHbTimer.expired()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
   }
+
 }
 
 /*
@@ -397,7 +414,6 @@ void updateState() {
     if (hazardsTimer.check()) { // timer expired, toggle
       state.rightTurnOn = !state.rightTurnOn;
       state.leftTurnOn = state.rightTurnOn; // make sure they have same value
-      hazardsTimer.reset();
     }
   }
   else { // hazards inactive
@@ -405,7 +421,6 @@ void updateState() {
     if (state.rightTurn) { // right turn signal active
       if (rightTurnTimer.check()) { // timer expired, toggle
         state.rightTurnOn = !state.rightTurnOn;
-        rightTurnTimer.reset();
       }
     }
     else { // right turn signal inactive
@@ -415,7 +430,6 @@ void updateState() {
     if (state.leftTurn) { // left turn signal active
       if (leftTurnTimer.check()) { // timer expired, toggle
         state.leftTurnOn = !state.leftTurnOn;
-        leftTurnTimer.reset();
       }
     }
     else { // left turn signal inactive
@@ -423,9 +437,16 @@ void updateState() {
     }
   }
 
-  // Trip if temp sensors are overtemp
-  if(state.celsius >= MAX_TEMP){
-    state.tripped = true;
+  // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
+  if(state.bmsCurrent < 0.0){   // negative current, discharge
+    if(state.maxTemp >= DISCHARGE_TEMP){
+      state.tripped = true;
+    }
+  }
+  else{ // positive current, charge
+    if(state.maxTemp >= CHARGE_TEMP){
+      state.tripped = true;
+    }
   }
   
   // update cruise control state
@@ -496,8 +517,9 @@ void updateState() {
     state.ignition = Ignition_Park;
   }
   else {
-    state.ignition = state.ignitionRaw;
+    state.ignition = state.ignitionRaw; 
   }
+  //digitalWrite(BOARDLED,state.ignition == Ignition_Park ? HIGH : LOW);
   
   //Enable alternate steering if the SW is disconnected.
   if (NO_STEERING || state.dcErrorFlags & SW_TIMEOUT)
@@ -523,7 +545,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check() && !state.tripped) { // ready to send drive command
+  if (dcDriveTimer.expired() && !state.tripped) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -562,7 +584,7 @@ void writeCAN() {
   }
   
   // check if driver controls heartbeat needs to be sent
-  if (dcHbTimer.check()) {
+  if (dcHbTimer.expired()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
@@ -571,7 +593,7 @@ void writeCAN() {
   }
 
   // check if driver controls info packet needs to be sent
-  if (dcInfoTimer.check()) {
+  if (dcInfoTimer.expired()) {
     // create and send packet
     /*DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
@@ -594,7 +616,7 @@ void writeCAN() {
     state.wasReset = false; // clear reset    
   }
   
-  if (dcPowerTimer.check()) {
+  if (dcPowerTimer.expired()) {
     bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     
     if (trysend) 
@@ -639,89 +661,114 @@ void checkErrors() {
 }
 
 void ReadTempSensor() {
-  byte i;
-  byte present = 0;
-  byte type_s;
-  byte data[12];
-  byte addr[8];
+
+  if (tempReadTimer.check()) { // temp sensor timeout
   
-  if ( !ds.search(addr)) {
-    //Serial.println("No more addresses.");
-    //Serial.println();
-    ds.reset_search();
-    //delay(250);
-    return;
-  }
-
-  if (OneWire::crc8(addr, 7) != addr[7]) {
-      //Serial.println("CRC is not valid!");
-      return;
-  }
-  //Serial.println();
- 
-  // the first ROM byte indicates which chip
-  switch (addr[0]) {
-    case 0x10:
-      //Serial.println("  Chip = DS18S20");  // or old DS1820
-      type_s = 1;
-      break;
-    case 0x28:
-      //Serial.println("  Chip = DS18B20");
-      type_s = 0;
-      break;
-    case 0x22:
-      //Serial.println("  Chip = DS1822");
-      type_s = 0;
-      break;
-    default:
-      //Serial.println("Device is not a DS18x20 family device.");
-      return;
-  } 
-
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+    byte i;
+    byte present = 0;
+    byte type_s;
+    byte data[12];
+    
+    type_s=0;  //we're only using DS18B20 devices (as opposed to other OneWire devices)
   
-  //delay(1000);     // maybe 750ms is enough, maybe not
-  // we might do a ds.depower() here, but the reset will take care of it.
   
-  present = ds.reset();
-  ds.select(addr);    
-  ds.write(0xBE);         // Read Scratchpad
-
-  //Serial.print("  Data = ");
-  //Serial.print(present, HEX);
-  //Serial.print(" ");
-  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-    data[i] = ds.read();
-    //Serial.print(data[i], HEX);
-    //Serial.print(" ");
-  }
-  //Serial.print(" CRC=");
-  //Serial.print(OneWire::crc8(data, 8), HEX);
-  //Serial.println();
-
-  // Convert the data to actual temperature
-  // because the result is a 16 bit signed integer, it should
-  // be stored to an "int16_t" type, which is always 16 bits
-  // even when compiled on a 32 bit processor.
-  int16_t raw = (data[1] << 8) | data[0];
-  if (type_s) {
-    raw = raw << 3; // 9 bit resolution default
-    if (data[7] == 0x10) {
-      // "count remain" gives full 12 bit resolution
-      raw = (raw & 0xFFF0) + 12 - data[6];
+     if ( !ds.search(addr)) {
+      ds.reset_search();
+      //Serial.print("no more addresses");
+       }
+  
+    if (OneWire::crc8(addr, 7) != addr[7]) {
+        //Serial.println("CRC is not valid!");
+        return;
     }
-  } else {
-    byte cfg = (data[4] & 0x60);
-    // at lower res, the low bits are undefined, so let's zero them
-    if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-    else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-    else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-    //// default is 12 bit resolution, 750 ms conversion time
+  
+  if (tempCount==0) 
+    {
+      ds.reset();                  
+      ds.skip();                   // tell all sensors on bus
+      ds.write(0x44,0);            // to convert temperature
+      tempCount++;
+      tempConvertTimer.reset();
+    }
+  else if ((tempCount > 0) && tempConvertTimer.expired())
+    {
+      present = ds.reset();
+  
+     ds.select(addr);    
+     ds.write(0xBE);         // Read Scratchpad
+  
+     //Serial.print("  Data = ");
+     //Serial.print(present, HEX);
+     //Serial.print(" ");
+     for ( i = 0; i < 9; i++) {           // we need 9 bytes
+       data[i] = ds.read();
+       //Serial.print(data[i], HEX);
+       //Serial.print(" ");
+     }
+     //Serial.print(" CRC=");
+     //Serial.print(OneWire::crc8(data, 8), HEX);
+     //Serial.println();  
+  
+      // Convert the data to actual temperature
+      // because the result is a 16 bit signed integer, it should
+      // be stored to an "int16_t" type, which is always 16 bits
+     // even when compiled on a 32 bit processor.
+     int16_t raw = (data[1] << 8) | data[0];
+     if (type_s) {
+       raw = raw << 3; // 9 bit resolution default
+       if (data[7] == 0x10) {
+         // "count remain" gives full 12 bit resolution
+          raw = (raw & 0xFFF0) + 12 - data[6];
+        }
+     } else {
+        byte cfg = (data[4] & 0x60);
+        // at lower res, the low bits are undefined, so let's zero them
+        if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+        else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+        else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+        //// default is 12 bit resolution, 750 ms conversion time
+     }
+  
+      
+      state.celsius[tempCount-1] = (float)raw / 16.0;
+      state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
+  
+      if (state.celsius[tempCount-1] > state.maxTemp)
+      {
+        state.maxTemp=state.celsius[tempCount-1];       //keep the maxTemp value updated
+      }
+      
+      tempCount++;
+      
+      if (tempCount==27)
+      {
+          tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
+            
+          // Calculate Average Temperature  //
+          j=0;                            // contains sum of temps
+          for (i = 0; i < 26; i++)
+          {
+            j=j + state.celsius[i];
+          }
+          state.avgTemp=j/26;
+
+          // Calculate Max Temperature //
+          j=0;
+          for (i = 0; i < 26; i++)
+          {
+            if (state.celsius[i] > j)
+            {
+              j=state.celsius[i];
+            }
+          }
+          state.maxTemp=j;
+      }
+    
   }
-  state.celsius = (float)raw / 16.0;
-  state.fahrenheit = state.celsius * 1.8 + 32.0;
+
+} 
+
+  
 }
 
 //--------------------------MAIN FUNCTIONS---------------------------//
@@ -776,7 +823,9 @@ void setup() {
   dcInfoTimer.reset();
   dcHbTimer.reset();
   debugTimer.reset();
-  
+  tempConvertTimer.reset();
+  tempReadTimer.reset();
+
   
   // setup CAN
   canControl.filters.setRB0(RXM0, RXF0, RXF1);
@@ -793,6 +842,8 @@ void setup() {
     Serial.print("Init CAN error: ");
     Serial.println(canControl.errors, HEX);
   }
+
+
 }
 
 void loop() {
@@ -801,14 +852,15 @@ void loop() {
     loopStartTime = micros();
   }
   
-  // clear watchdog timer
-  WDT_Restart(WDT);
+
+  //read temp sensors
+  ReadTempSensor();
   
   // read GPIO
   readInputs();
-
-  // read Tempsensors
-  ReadTempSensor();
+  
+  // clear watchdog timer
+  WDT_Restart(WDT);
 
   // get any CAN messages that have come in
   canControl.Fetch();
@@ -847,7 +899,7 @@ void loop() {
   }
   
   // debugging printout
-  if (DEBUG && debugTimer.check()) {
+  if (DEBUG && debugTimer.expired()) {
     
     /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
     byte Txstatus[3] = {0,0,0};
@@ -894,7 +946,7 @@ void loop() {
     Serial.print("System time: ");
     Serial.println(millis());
     Serial.println();
-    
+
     switch (debugStep) {
       case 0:
         Serial.print("Brake pin: ");
@@ -917,6 +969,10 @@ void loop() {
       case 1:
         Serial.print("Ignition: ");
         Serial.println(state.ignition,HEX);
+        Serial.print("IgnitionRaw: ");
+        Serial.println(state.ignitionRaw,HEX);
+        Serial.print("Ignition digitalRead: ");
+        Serial.println(digitalRead(52));
         Serial.print("Horn: ");
         Serial.println(state.horn ? "ON" : "OFF");
         Serial.print("Headlights: ");
@@ -962,11 +1018,19 @@ void loop() {
         }
         break;
         case 3:
-          Serial.print("Temperature = ");
-          Serial.print(state.celsius);
-          Serial.print(" Celsius, ");
-          Serial.print(state.fahrenheit);
-          Serial.println(" Fahrenheit");
+            for (i = 0; i < 26; i++)
+            {
+               Serial.print("Temperature = ");
+               Serial.print(state.celsius[i]);
+               Serial.print(" Celsius, ");
+               Serial.print(state.fahrenheit[i]);
+               Serial.println(" Fahrenheit");
+            }
+            Serial.print("Average Temp: ");
+            Serial.println(state.avgTemp);
+            Serial.print("Max Temp: ");
+            Serial.println(state.maxTemp);
+         
          break;
     }
     
