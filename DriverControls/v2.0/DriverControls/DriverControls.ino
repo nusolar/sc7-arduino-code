@@ -30,6 +30,7 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
+//const byte BMS_STROBE_PIN = xx;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -41,7 +42,7 @@ const uint16_t RXF1      = BMS_VOLT_CURR_ID; // Can't put 0 here, otherwise it w
 
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF2      = SW_DATA_ID;
-const uint16_t RXF3      = 0; // Most useless: replace first (soc not used by DC currently)
+const uint16_t RXF3      = BMS_STATUS_EXT_ID;
 const uint16_t RXF4      = MC_VELOCITY_ID;
 const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
 
@@ -88,7 +89,7 @@ const byte SW_ON_BIT   = 0;        // value that corresponds to on for steering 
 const bool NO_STEERING = false;    // set to true to read light, horn, gear controls directly from board (also automatically enabled when comm with SW is lost).
 
 // BMS parameters
-const float MAX_CURRENT_THRESH		= 68000; // mA
+const float MAX_CURRENT_THRESH    = 68000; // mA
 const float CONTINUOUS_CURRENT_THRESH   = 50000; // current may exceed this value no more than 7 times in 50 ms
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
@@ -100,6 +101,11 @@ const uint16_t SW_TIMEOUT  = 0x04; // sw timed out
 const uint16_t SW_BAD_GEAR = 0x08; // bad gearing from steering wheel
 const uint16_t BMS_OVER_CURR = 0x10; // Detected BMS overcurrent, tripped car.
 const uint16_t RESET_MCP2515 = 0x20; // Had to reset the MCP2515
+
+// bms status flags
+const uint32_t OVERVOLTAGE = 0x01;
+const uint32_t UNDERVOLTAGE = 0x02;
+const uint32_t DRIVERCONTROLSERROR = 0x20;
 
 //temp sensor object
 OneWire ds(50);
@@ -179,10 +185,12 @@ struct CarState {
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
   bool leftTurnOn;    // true if we should turn lt signal on
+  bool bmsStrobeOn;   // true if we should turn on the bms strobe (for tripping)
 
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
   uint16_t dcErrorFlags;  // keep track of other errors
+  uint32_t bmsErrorFlags; // keep track of error flags from BMS (for bms led strobe)
 
   //temperature
   float celsius[26];
@@ -317,6 +325,10 @@ void readCAN() {
       BMS_SOC packet(f);
       state.bmsPercentSOC = packet.percent_SOC;
     }
+    else if (f.id == BMS_STATUS_EXT_ID) { //bms status
+      BMS_Status_Ext packet(f);
+      state.bmsErrorFlags = packet.flags;
+    }
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
       
@@ -441,12 +453,28 @@ void updateState() {
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
       state.tripped = true;
+      state.bmsStrobeOn = true;
     }
   }
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
       state.tripped = true;
+      state.bmsStrobeOn = true;
     }
+  }
+
+  // bms strobe light trip conditions
+  if(state.bmsErrorFlags && OVERVOLTAGE == 0x01){
+    state.tripped = true;
+    state.bmsStrobeOn = true;
+  }
+  if(state.bmsErrorFlags && UNDERVOLTAGE == 0x02){
+    state.tripped = true;
+    state.bmsStrobeOn = true;
+  }
+  if(state.bmsErrorFlags && DRIVERCONTROLSERROR == 0x20){
+    state.tripped = true;
+    state.bmsStrobeOn = true; 
   }
   
   // update cruise control state
@@ -501,10 +529,11 @@ void updateState() {
     state.currentBuffer[state.currentBufferIndex] = absBMSCurrent; // store current in buffer
     state.currentBufferIndex = (state.currentBufferIndex+1) % CURRENT_BUFFER_SIZE; // increment buffer index
     
-    //Check for a trip condition
+    //Check for a current trip condition
     if (absBMSCurrent >= MAX_CURRENT_THRESH ||
         state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
       state.tripped = true;
+      state.bmsStrobeOn = true;
       state.dcErrorFlags |= BMS_OVER_CURR;
     }
 
@@ -536,7 +565,8 @@ void writeOutputs() {
   digitalWrite(HEADLIGHT_PIN, state.headlights ? HIGH : LOW);
   digitalWrite(BRAKELIGHT_PIN, state.brakeEngaged ? HIGH : LOW);
   digitalWrite(RIGHT_TURN_PIN, state.rightTurnOn ? HIGH : LOW);
-  digitalWrite(LEFT_TURN_PIN, state.leftTurnOn ? HIGH : LOW);  
+  digitalWrite(LEFT_TURN_PIN, state.leftTurnOn ? HIGH : LOW);
+  //digitalWrite(BMS_STROBE_PIN, state.bmsStrobeOn ? HIGH : LOW); 
 }
 
 /*
@@ -603,7 +633,7 @@ void writeCAN() {
     bool trysend = canControl.Send(packet, TXBANY);*/
 
     bool trysend = canControl.SendVerified(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged, state.canErrorFlags, state.dcErrorFlags, state.wasReset,
-                                            ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition),
+                                            ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition, state.tripped),
                                     TXBANY);
 
     //Serial.println("Sending DC_Info: ");
@@ -782,6 +812,7 @@ void setup() {
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
+  //pinMode(BMS_STROBE_PIN, OUTPUT);
   
   // init steering wheel inputs for use if we lose the steering wheel
   pinMode(NEUTRAL_PIN, INPUT_PULLUP);
@@ -811,6 +842,7 @@ void setup() {
     state.currentBuffer[i] = 0;
   }
   state.tripped = false;
+  state.bmsStrobeOn = false;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -989,6 +1021,8 @@ void loop() {
         Serial.println(state.leftTurnOn ? "YES" : "NO");
         Serial.print("Hazards: ");
         Serial.println(state.hazards ? "YES" : "NO");
+        Serial.print("BMS Strobe: ");
+        Serial.println(state.bmsStrobeOn ? "YES" : "NO");
         break;
       case 2: 
         //Serial.print("Cruise control: ");
