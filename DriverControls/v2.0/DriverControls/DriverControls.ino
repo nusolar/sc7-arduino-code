@@ -77,7 +77,8 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
-const float    MAX_TEMP            = 60.0;    // absolute max battery temp in celsius
+const float    CHARGE_TEMP         = 45.0;    // battery temp threshold when current is positive
+const float    DISCHARGE_TEMP      = 60.0;    // battery temp threshold when current is negative
 
 // steering wheel parameters
 const byte NEUTRAL_RAW = 0x03;
@@ -436,9 +437,16 @@ void updateState() {
     }
   }
 
-  // Trip if temp sensors are overtemp
-  if(state.maxTemp >= MAX_TEMP){
-    state.tripped = true;
+  // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
+  if(state.bmsCurrent < 0.0){   // negative current, discharge
+    if(state.maxTemp >= DISCHARGE_TEMP){
+      state.tripped = true;
+    }
+  }
+  else{ // positive current, charge
+    if(state.maxTemp >= CHARGE_TEMP){
+      state.tripped = true;
+    }
   }
   
   // update cruise control state
