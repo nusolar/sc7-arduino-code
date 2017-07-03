@@ -222,8 +222,7 @@ byte tempCount;    // keeps track of how many times readTempSensor() has run
 byte addr[8];
 
 byte i;            // just used as a counter variable to print out ALL temperatures in the serial debug section
-float avg;         // contains the average temperature
-float sum;         // temporarily stores sum of all temps when computing avg
+float j;         // used as a counter when calculating Avg and Max temperatures
 
 //--------------------------HELPER FUNCTIONS--------------------------//
 /*
@@ -736,7 +735,25 @@ void ReadTempSensor() {
       if (tempCount==27)
       {
           tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
-          state.maxTemp=0;
+            
+          // Calculate Average Temperature  //
+          j=0;                            // contains sum of temps
+          for (i = 0; i < 26; i++)
+          {
+            j=j + state.celsius[i];
+          }
+          state.avgTemp=j/26;
+
+          // Calculate Max Temperature //
+          j=0;
+          for (i = 0; i < 26; i++)
+          {
+            if (state.celsius[i] > j)
+            {
+              j=state.celsius[i];
+            }
+          }
+          state.maxTemp=j;
       }
     
   }
@@ -1001,13 +1018,6 @@ void loop() {
                Serial.print(state.fahrenheit[i]);
                Serial.println(" Fahrenheit");
             }
-            //Calculate Average Temperature  //
-            for (i = 0; i < 26; i++)
-            {
-              sum=sum + state.celsius[i];
-            }
-            state.avgTemp=sum/26;
-            sum=0;
             Serial.print("Average Temp: ");
             Serial.println(state.avgTemp);
             Serial.print("Max Temp: ");
