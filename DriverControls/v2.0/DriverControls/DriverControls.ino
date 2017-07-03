@@ -18,7 +18,7 @@ byte       debugStep   = 0;       // It's too slow to send out all the debug ove
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
 // pins
-const byte IGNITION_PIN    = 52;
+const byte IGNITION_PIN   = 52;
 const byte BRAKE_PIN      = 9;
 const byte ACCEL_PIN      = A0;
 const byte REGEN_PIN      = A1;
@@ -56,7 +56,10 @@ const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
-const uint16_t TEMP_INTERVAL     = 100;   // interval for temp sense updating
+const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
+const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
+
+
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -206,7 +209,8 @@ Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
 Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
 Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
-Metro tempSenseTimer(TEMP_INTERVAL);   // timer for updating temp sensor array
+Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
+Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
 
 // debugging variables
 long loopStartTime = 0;
@@ -247,6 +251,7 @@ void readInputs() {
   
   // read ignition switch
   state.ignitionRaw = digitalRead(IGNITION_PIN) == LOW ? Ignition_Start : Ignition_Park;
+  digitalWrite(BOARDLED,digitalRead(IGNITION_PIN));
   
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
@@ -344,23 +349,20 @@ void readCAN() {
  */
 void checkTimers() {
   // check motor controller
-  if (mcHbTimer.check()) { // motor controller timeout
+  if (mcHbTimer.expired()) { // motor controller timeout
     state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
   
   // check bms
-  if (bmsHbTimer.check()) { // bms timeout
+  if (bmsHbTimer.expired()) { // bms timeout
     state.dcErrorFlags |= BMS_TIMEOUT; // set flag
   }
   
   // check steering wheel
-  if (swHbTimer.check()) { // steering wheel timeout
+  if (swHbTimer.expired()) { // steering wheel timeout
     state.dcErrorFlags |= SW_TIMEOUT; // set flag
   }
 
-  if (tempSenseTimer.check()) { // temp sensor timeout
-    ReadTempSensor();
-  }
 }
 
 /*
@@ -412,7 +414,6 @@ void updateState() {
     if (hazardsTimer.check()) { // timer expired, toggle
       state.rightTurnOn = !state.rightTurnOn;
       state.leftTurnOn = state.rightTurnOn; // make sure they have same value
-      hazardsTimer.reset();
     }
   }
   else { // hazards inactive
@@ -420,7 +421,6 @@ void updateState() {
     if (state.rightTurn) { // right turn signal active
       if (rightTurnTimer.check()) { // timer expired, toggle
         state.rightTurnOn = !state.rightTurnOn;
-        rightTurnTimer.reset();
       }
     }
     else { // right turn signal inactive
@@ -430,7 +430,6 @@ void updateState() {
     if (state.leftTurn) { // left turn signal active
       if (leftTurnTimer.check()) { // timer expired, toggle
         state.leftTurnOn = !state.leftTurnOn;
-        leftTurnTimer.reset();
       }
     }
     else { // left turn signal inactive
@@ -511,8 +510,9 @@ void updateState() {
     state.ignition = Ignition_Park;
   }
   else {
-    state.ignition = state.ignitionRaw;
+    state.ignition = state.ignitionRaw; 
   }
+  //digitalWrite(BOARDLED,state.ignition == Ignition_Park ? HIGH : LOW);
   
   //Enable alternate steering if the SW is disconnected.
   if (NO_STEERING || state.dcErrorFlags & SW_TIMEOUT)
@@ -538,7 +538,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.check() && !state.tripped) { // ready to send drive command
+  if (dcDriveTimer.expired() && !state.tripped) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -577,7 +577,7 @@ void writeCAN() {
   }
   
   // check if driver controls heartbeat needs to be sent
-  if (dcHbTimer.check()) {
+  if (dcHbTimer.expired()) {
     // create and send packet
     canControl.Send(DC_Heartbeat(DC_ID, DC_SER_NO), TXBANY);
 
@@ -586,7 +586,7 @@ void writeCAN() {
   }
 
   // check if driver controls info packet needs to be sent
-  if (dcInfoTimer.check()) {
+  if (dcInfoTimer.expired()) {
     // create and send packet
     /*DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
@@ -609,7 +609,7 @@ void writeCAN() {
     state.wasReset = false; // clear reset    
   }
   
-  if (dcPowerTimer.check()) {
+  if (dcPowerTimer.expired()) {
     bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     
     if (trysend) 
@@ -654,91 +654,94 @@ void checkErrors() {
 }
 
 void ReadTempSensor() {
- 
-  byte i;
-  byte present = 0;
-  byte type_s;
-  byte data[12];
+
+  if (tempReadTimer.check()) { // temp sensor timeout
   
-  type_s=0;  //we're only using DS18B20 devices (as opposed to other OneWire devices)
-
-
-   if ( !ds.search(addr)) {
-    ds.reset_search();
-    //Serial.print("no more addresses");
-     }
-
-  if (OneWire::crc8(addr, 7) != addr[7]) {
-      //Serial.println("CRC is not valid!");
-      return;
-  }
+    byte i;
+    byte present = 0;
+    byte type_s;
+    byte data[12];
+    
+    type_s=0;  //we're only using DS18B20 devices (as opposed to other OneWire devices)
   
-if (tempCount==0)
-  {
-    ds.reset();                  
-    ds.skip();                   // tell all sensors on bus
-    ds.write(0x44,0);            // to convert temperature
-    tempCount++;
-  }
-else
-  {
-    present = ds.reset();
-
-   ds.select(addr);    
-   ds.write(0xBE);         // Read Scratchpad
-
-   //Serial.print("  Data = ");
-   //Serial.print(present, HEX);
-   //Serial.print(" ");
-   for ( i = 0; i < 9; i++) {           // we need 9 bytes
-     data[i] = ds.read();
-     //Serial.print(data[i], HEX);
+  
+     if ( !ds.search(addr)) {
+      ds.reset_search();
+      //Serial.print("no more addresses");
+       }
+  
+    if (OneWire::crc8(addr, 7) != addr[7]) {
+        //Serial.println("CRC is not valid!");
+        return;
+    }
+  
+  if (tempCount==0) 
+    {
+      ds.reset();                  
+      ds.skip();                   // tell all sensors on bus
+      ds.write(0x44,0);            // to convert temperature
+      tempCount++;
+      tempConvertTimer.reset();
+    }
+  else if ((tempCount > 0) && tempConvertTimer.expired())
+    {
+      present = ds.reset();
+  
+     ds.select(addr);    
+     ds.write(0xBE);         // Read Scratchpad
+  
+     //Serial.print("  Data = ");
+     //Serial.print(present, HEX);
      //Serial.print(" ");
-   }
-   //Serial.print(" CRC=");
-   //Serial.print(OneWire::crc8(data, 8), HEX);
-   //Serial.println();  
-
-    // Convert the data to actual temperature
-    // because the result is a 16 bit signed integer, it should
-    // be stored to an "int16_t" type, which is always 16 bits
-   // even when compiled on a 32 bit processor.
-   int16_t raw = (data[1] << 8) | data[0];
-   if (type_s) {
-     raw = raw << 3; // 9 bit resolution default
-     if (data[7] == 0x10) {
-       // "count remain" gives full 12 bit resolution
-        raw = (raw & 0xFFF0) + 12 - data[6];
+     for ( i = 0; i < 9; i++) {           // we need 9 bytes
+       data[i] = ds.read();
+       //Serial.print(data[i], HEX);
+       //Serial.print(" ");
+     }
+     //Serial.print(" CRC=");
+     //Serial.print(OneWire::crc8(data, 8), HEX);
+     //Serial.println();  
+  
+      // Convert the data to actual temperature
+      // because the result is a 16 bit signed integer, it should
+      // be stored to an "int16_t" type, which is always 16 bits
+     // even when compiled on a 32 bit processor.
+     int16_t raw = (data[1] << 8) | data[0];
+     if (type_s) {
+       raw = raw << 3; // 9 bit resolution default
+       if (data[7] == 0x10) {
+         // "count remain" gives full 12 bit resolution
+          raw = (raw & 0xFFF0) + 12 - data[6];
+        }
+     } else {
+        byte cfg = (data[4] & 0x60);
+        // at lower res, the low bits are undefined, so let's zero them
+        if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+        else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+        else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+        //// default is 12 bit resolution, 750 ms conversion time
+     }
+  
+      
+      state.celsius[tempCount-1] = (float)raw / 16.0;
+      state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
+  
+      if (state.celsius[tempCount-1] > state.maxTemp)
+      {
+        state.maxTemp=state.celsius[tempCount-1];       //keep the maxTemp value updated
       }
-   } else {
-      byte cfg = (data[4] & 0x60);
-      // at lower res, the low bits are undefined, so let's zero them
-      if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-      else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-      else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-      //// default is 12 bit resolution, 750 ms conversion time
-   }
-
-    
-    state.celsius[tempCount-1] = (float)raw / 16.0;
-    state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
-
-    if (state.celsius[tempCount-1] > state.maxTemp)
-    {
-      state.maxTemp=state.celsius[tempCount-1];       //keep the maxTemp value updated
-    }
-    
-    tempCount++;
-    
-    if (tempCount==27)
-    {
-        tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
-        state.maxTemp=0;
-    }
+      
+      tempCount++;
+      
+      if (tempCount==27)
+      {
+          tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
+          state.maxTemp=0;
+      }
     
   }
 
- 
+} 
 
   
 }
@@ -795,7 +798,9 @@ void setup() {
   dcInfoTimer.reset();
   dcHbTimer.reset();
   debugTimer.reset();
-  
+  tempConvertTimer.reset();
+  tempReadTimer.reset();
+
   
   // setup CAN
   canControl.filters.setRB0(RXM0, RXF0, RXF1);
@@ -822,11 +827,15 @@ void loop() {
     loopStartTime = micros();
   }
   
-  // clear watchdog timer
-  WDT_Restart(WDT);
+
+  //read temp sensors
+  ReadTempSensor();
   
   // read GPIO
   readInputs();
+  
+  // clear watchdog timer
+  WDT_Restart(WDT);
 
   // get any CAN messages that have come in
   canControl.Fetch();
@@ -865,7 +874,7 @@ void loop() {
   }
   
   // debugging printout
-  if (DEBUG && debugTimer.check()) {
+  if (DEBUG && debugTimer.expired()) {
     
     /************************ TEMP CAN DEBUGGING VARIABLES (DELETE LATER)******/
     byte Txstatus[3] = {0,0,0};
@@ -912,7 +921,7 @@ void loop() {
     Serial.print("System time: ");
     Serial.println(millis());
     Serial.println();
-    
+
     switch (debugStep) {
       case 0:
         Serial.print("Brake pin: ");
