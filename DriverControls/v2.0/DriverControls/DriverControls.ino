@@ -464,15 +464,15 @@ void updateState() {
   }
 
   // bms strobe light trip conditions
-  if(state.bmsErrorFlags && OVERVOLTAGE == 0x01){
+  if(state.bmsErrorFlags && BMS_Status_Ext::F_OVERVOLTAGE){
     state.tripped = true;
     state.bmsStrobeOn = true;
   }
-  if(state.bmsErrorFlags && UNDERVOLTAGE == 0x02){
+  if(state.bmsErrorFlags && BMS_Status_Ext::F_UNDERVOLTAGE){
     state.tripped = true;
     state.bmsStrobeOn = true;
   }
-  if(state.bmsErrorFlags && DRIVERCONTROLSERROR == 0x20){
+  if(state.bmsErrorFlags && BMS_Status_Ext::F_DRVCTRLSLOST){
     state.tripped = true;
     state.bmsStrobeOn = true; 
   }
