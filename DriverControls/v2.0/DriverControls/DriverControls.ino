@@ -89,6 +89,7 @@ const bool NO_STEERING = false;    // set to true to read light, horn, gear cont
 // BMS parameters
 const float MAX_CURRENT_THRESH    = 68000; // mA
 const float CONTINUOUS_CURRENT_THRESH   = 50000; // current may exceed this value no more than 7 times in 50 ms
+const float CHARGE_CURRENT_THRESH       = 36000; // current limit for charging (36.4 to be exact)
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
 
@@ -510,10 +511,14 @@ void updateState() {
   // check for trip current condition from BMS
   if (state.updateCurrentBufferRequested)
   {
+    // charging current check
+    if (state.bmsCurrent > 0.0 && state.bmsCurrent >= CHARGE_CURRENT_THRESH){
+      state.tripped = true;
+      state.bmsStrobeOn = true;
+    }
     // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
     // and the other is undercurrent, it increments/decrements the counter accordingly.
     float absBMSCurrent = abs(state.bmsCurrent);
-
     if (absBMSCurrent >= CONTINUOUS_CURRENT_THRESH && 
         state.currentBuffer[state.currentBufferIndex] < CONTINUOUS_CURRENT_THRESH) { // increment overcurrent counter
       state.numOvercurrents++;
