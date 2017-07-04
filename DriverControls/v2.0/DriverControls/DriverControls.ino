@@ -30,7 +30,7 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
-//const byte BMS_STROBE_PIN = 48;
+const byte BMS_STROBE_PIN = 48;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -564,7 +564,7 @@ void writeOutputs() {
   digitalWrite(BRAKELIGHT_PIN, state.brakeEngaged ? HIGH : LOW);
   digitalWrite(RIGHT_TURN_PIN, state.rightTurnOn ? HIGH : LOW);
   digitalWrite(LEFT_TURN_PIN, state.leftTurnOn ? HIGH : LOW);
-  //digitalWrite(BMS_STROBE_PIN, state.bmsStrobeOn ? HIGH : LOW); 
+  digitalWrite(BMS_STROBE_PIN, state.bmsStrobeOn ? HIGH : LOW); 
 }
 
 /*
@@ -810,7 +810,7 @@ void setup() {
   pinMode(RIGHT_TURN_PIN, OUTPUT);
   pinMode(LEFT_TURN_PIN, OUTPUT);
   pinMode(BOARDLED,OUTPUT);
-  //pinMode(BMS_STROBE_PIN, OUTPUT);
+  pinMode(BMS_STROBE_PIN, OUTPUT);
   
   // init steering wheel inputs for use if we lose the steering wheel
   pinMode(NEUTRAL_PIN, INPUT_PULLUP);
