@@ -30,7 +30,7 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13;
 const byte BOARDLED       = 13;
-//const byte BMS_STROBE_PIN = xx;
+//const byte BMS_STROBE_PIN = 48;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 1000;
@@ -59,8 +59,6 @@ const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
 const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
-
-
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -464,17 +462,17 @@ void updateState() {
   }
 
   // bms strobe light trip conditions
-  if(state.bmsErrorFlags && BMS_Status_Ext::F_OVERVOLTAGE){
+  if(state.bmsErrorFlags & BMS_Status_Ext::F_OVERVOLTAGE){
     state.tripped = true;
     state.bmsStrobeOn = true;
   }
-  if(state.bmsErrorFlags && BMS_Status_Ext::F_UNDERVOLTAGE){
+  if(state.bmsErrorFlags & BMS_Status_Ext::F_UNDERVOLTAGE){
     state.tripped = true;
     state.bmsStrobeOn = true;
   }
-  if(state.bmsErrorFlags && BMS_Status_Ext::F_DRVCTRLSLOST){
+  if(state.bmsErrorFlags & BMS_Status_Ext::F_DRVCTRLSLOST){
     state.tripped = true;
-    state.bmsStrobeOn = true; 
+    state.bmsStrobeOn = true;
   }
   
   // update cruise control state
