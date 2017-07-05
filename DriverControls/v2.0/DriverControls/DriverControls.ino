@@ -13,7 +13,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG       = true;    // change to true to output debug info over serial
+const bool DEBUG       = false;    // change to true to output debug info over serial
 byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
@@ -76,8 +76,8 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
-const float    CHARGE_TEMP         = 45.0;    // battery temp threshold when current is positive
-const float    DISCHARGE_TEMP      = 60.0;    // battery temp threshold when current is negative
+const uint8_t    CHARGE_TEMP         = 45;    // battery temp threshold when current is positive
+const uint8_t    DISCHARGE_TEMP      = 60;    // battery temp threshold when current is negative
 
 // steering wheel parameters
 const byte NEUTRAL_RAW = 0x03;
@@ -452,13 +452,17 @@ void updateState() {
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
       state.tripped = true;
-      state.bmsStrobeOn = true;
+      state.bmsStrobeOn = true; 
+      Serial.print("Batteries are discharging, and the max temperature is ");
+      Serial.println(state.maxTemp);
     }
-  }
+  }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
       state.tripped = true;
       state.bmsStrobeOn = true;
+      Serial.print("Batteries are charging, and the max temperature is ");
+      Serial.println(state.maxTemp);
     }
   }
 
@@ -643,7 +647,8 @@ void writeCAN() {
   }
 
   if (tempReadTimer.expired())
-    canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsFahrenheit); // send first 6 temps + min and average
+  {
+    canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsFahrenheit),TXBANY); // send first 6 temps + min and average
     // Don't reset yet because then the temperature sensor code will never see the timer expired.
   }
 }
@@ -722,7 +727,7 @@ void ReadTempSensor() {
      ds.write(0xBE);         // Read Scratchpad
   
      //Serial.print("  Data = ");
-     //Serial.print(present, HEX);
+     //Serial.println(present, HEX);
      //Serial.print(" ");
      for ( i = 0; i < 9; i++) {           // we need 9 bytes
        data[i] = ds.read();
@@ -738,6 +743,10 @@ void ReadTempSensor() {
       // be stored to an "int16_t" type, which is always 16 bits
      // even when compiled on a 32 bit processor.
      int16_t raw = (data[1] << 8) | data[0];
+     /*Serial.print("RAW = ");
+     Serial.print(raw, HEX);
+     Serial.print(", ");
+     Serial.print(raw);*/
      if (type_s) {
        raw = raw << 3; // 9 bit resolution default
        if (data[7] == 0x10) {
@@ -752,15 +761,9 @@ void ReadTempSensor() {
         else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
         //// default is 12 bit resolution, 750 ms conversion time
      }
-  
-      
-      state.tempsCelsius[tempCount-1] = (float)raw / 16.0;
-      state.tempsFahrenheit[tempCount-1] = state.tempsCelsius[tempCount-1] * 1.8 + 32.0;
-  
-      if (state.tempsCelsius[tempCount-1] > state.maxTemp)
-      {
-        state.maxTemp=state.tempsCelsius[tempCount-1];       //keep the maxTemp value updated
-      }
+
+      state.tempsCelsius[tempCount-1] = (raw >> 4) + 5;
+      state.tempsFahrenheit[tempCount-1] = (uint8_t)(state.tempsCelsius[tempCount-1] * 1.8 + 32.0);
       
       tempCount++;
       
@@ -1073,6 +1076,8 @@ void loop() {
     loopSumTime = 0;
     loopCount = 0;
   }
+  Serial.print("Max Temp: ");
+            Serial.println(state.maxTemp);
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
