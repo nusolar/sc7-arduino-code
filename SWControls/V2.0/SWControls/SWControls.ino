@@ -9,7 +9,7 @@
 //#define LOOPBACK
 #define DEBUG
 
-#define NOTSENDCAN
+//#define NOTSENDCAN
 
 /*Defining the bitwise functions (bitwise operators)
 We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
@@ -117,13 +117,14 @@ struct LCD{
   char telemetrydisplay; //'T' = telemetry on, ' ' = telemetry off
   String Lightsdisplay;  //"H" = headlights, "HZ" = hazardlights, " " = no lights
 
-#define DISPLAY_NUMBER_MAX  5
+#define DISPLAY_NUMBER_MAX  6
   //float SOCdisplay;        //state of charge (from CAN)
   float Veldisplay;        //velocity (from CAN)
   float MCurrentdisplay;    // Motor Current (from CAN)
   float ACurrentdisplay;    // Array Current (from CAN)
   float BCurrentdisplay;    // Battery Current (from CAN)
   float BVoltagedisplay;    // Pack Voltage (from CAN)
+  float MaxTempdisplay;     // Max Pack Temp (from CAN)
   uint8_t displayNumber;    // Selects which value to display
   
   boolean LTdisplay;     //distinguishes left turn
@@ -162,8 +163,8 @@ void setup() {
   pinMode(hornp, INPUT_PULLUP);
   pinMode(ltp, INPUT_PULLUP);
   pinMode(rtp, INPUT_PULLUP);
-  pinMode(displup, INPUT_PULLUP);
-  pinMode(displdown, INPUT_PULLUP);
+  pinMode(displupp, INPUT_PULLUP);
+  pinMode(displdownp, INPUT_PULLUP);
 
   //set Serial and screen baud rate to 9600bps
   Serial.begin(9600);
@@ -184,7 +185,7 @@ void setup() {
    * Configure RB0 to take SOC and Velocity packets for the display.
    * RB1 can be used for other packets as needed.
    */
-  CanControl.filters.setRB0(MASK_Sxxx,BMS_VOLT_CURR_ID,0); 
+  CanControl.filters.setRB0(MASK_Sxxx,BMS_VOLT_CURR_ID,DC_TEMP_1_ID); 
   CanControl.filters.setRB1(MASK_Sxxx,MC_VELOCITY_ID,MC_BUS_STATUS_ID,DC_INFO_ID,0);
   CanControl.Setup(RX0IE|RX1IE);
 
@@ -289,31 +290,37 @@ inline void defaultdisplay(){
       screen.setCursor(2,V-2);
       screen.print("M:");
       screen.setCursor(2,V);
-      screen.print(min(99,int(steering_wheel.Mcurrentdisplay)));
+      screen.print(int(steering_wheel.MCurrentdisplay));
     break;
     case 2: // Array Current
       screen.setCursor(2,V-2);
       screen.print("A:");
       screen.setCursor(2,V);
-      screen.print(min(99,int(steering_wheel.Acurrentdisplay)));
+      screen.print(int(steering_wheel.ACurrentdisplay));
     break;
     case 3: // Battery Current
       screen.setCursor(2,V-2);
       screen.print("B:");
       screen.setCursor(2,V);
-      screen.print(min(99,int(steering_wheel.Bcurrentdisplay)));
+      screen.print(int(steering_wheel.BCurrentdisplay));
     break;
     case 4: // Battery Current
       screen.setCursor(2,V-2);
       screen.print("B:");
       screen.setCursor(2,V);
-      screen.print(min(99,int(steering_wheel.Bcurrentdisplay)));
+      screen.print(int(steering_wheel.BCurrentdisplay));
     break;
     case 5: // Pack Voltage
       screen.setCursor(2,V-2);
       screen.print("P:");
       screen.setCursor(2,V);
-      screen.print(min(99,int(steering_wheel.Bvoltagedisplay)));
+      screen.print(int(steering_wheel.BVoltagedisplay));
+    break;
+    case 6: // Max Pack Temp Display
+      screen.setCursor(2,V-2);
+      screen.print("T:");
+      screen.setCursor(2,V);
+      screen.print(min(99,int(steering_wheel.MaxTempdisplay)));
     break;
   }
 }
@@ -483,32 +490,39 @@ void loop() {
  #endif
     switch (f.id)
     {
-      case BMS_VOLT_CUR_ID:
+      case BMS_VOLT_CURR_ID:
       {
-        BMS_VoltageCurrent packet(f); //This is where we get the State of charge
-        steering_wheel.Bcurrentdisplay = packet.current;
-        steering_wheel.Bvoltagedisplay = packet.voltage;
+        BMS_VoltageCurrent packet(f); //Get the voltage and current of the battery pack
+        steering_wheel.BCurrentdisplay = packet.current;
+        steering_wheel.BVoltagedisplay = packet.voltage;
         CAN_RX.reset();
         break;
       }
       case MC_VELOCITY_ID:
       {
-        MC_Velocity packet(f); // This is where we get the velocity
+        MC_Velocity packet(f); // Get Velocity
         steering_wheel.Veldisplay = packet.car_velocity*MPS_TO_MPH;
         CAN_RX.reset();
         break;
       }
       case MC_BUS_STATUS_ID:
       {
-        MC_BusStatus packet(f); // This is where we get the velocity
-        steering_wheel.Mcurrentdisplay = packet.bus_current;
+        MC_BusStatus packet(f); // Get Motor Current
+        steering_wheel.MCurrentdisplay = packet.bus_current;
+        CAN_RX.reset();
+        break;
+      }
+      case DC_TEMP_0_ID:
+      {
+        DC_Temp_0 packet(f); // Get Max Pack Temp
+        steering_wheel.MaxTempdisplay = packet.max_temp;
         CAN_RX.reset();
         break;
       }
       case DC_INFO_ID:
       {
-        DC_Info packet(f); // This is where we get the velocity
-        steering_wheel.tripped = packet.tripped
+        DC_Info packet(f); // Get Tripped state of vehicle
+        steering_wheel.tripped = packet.tripped;
         steering_wheel.notification = GENERIC_TRIP_STR;
         notif_timer.reset();
         CAN_RX.reset();
@@ -536,7 +550,7 @@ void loop() {
   CanControl.FetchStatus();
 
   //Update Array Current display value
-  steering_wheel.Acurrentdisplay = steering_wheel.Mcurrentdisplay - steering_wheel.Bcurrentdisplay;
+  steering_wheel.ACurrentdisplay = steering_wheel.MCurrentdisplay - steering_wheel.BCurrentdisplay;
 
   #ifdef DEBUG
     loopSumTime += (micros() - loopStartTime);
