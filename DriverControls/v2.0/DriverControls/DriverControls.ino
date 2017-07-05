@@ -76,6 +76,7 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
+const uint8_t    NUM_TEMP_MODULES    = 26;    // Number of temperature sensors
 const uint8_t    CHARGE_TEMP         = 45;    // battery temp threshold when current is positive
 const uint8_t    DISCHARGE_TEMP      = 60;    // battery temp threshold when current is negative
 
@@ -192,8 +193,8 @@ struct CarState {
   uint32_t bmsErrorFlags; // keep track of error flags from BMS (for bms led strobe)
 
   //temperature
-  uint8_t tempsCelsius[26];
-  uint8_t tempsFahrenheit[26];
+  uint8_t tempsCelsius[32];
+  uint8_t tempsFahrenheit[32];
   uint8_t maxTemp;
   uint8_t avgTemp;
 };
@@ -648,7 +649,12 @@ void writeCAN() {
 
   if (tempReadTimer.expired())
   {
-    canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsFahrenheit),TXBANY); // send first 6 temps + min and average
+    switch (tempCount) {
+      case 0: canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsFahrenheit),TXBANY); break; // send first 6 temps + min and average
+      case 1: canControl.Send(DC_Temp_1(state.tempsFahrenheit+6),TXBANY); break;                            // temps 7 - 14
+      case 2: canControl.Send(DC_Temp_2(state.tempsFahrenheit+14),TXBANY); break;                           // temps 15 - 22
+      case 3: canControl.Send(DC_Temp_3(state.tempsFahrenheit+22),TXBANY); break;                           // temps 23 - 26
+    }
     // Don't reset yet because then the temperature sensor code will never see the timer expired.
   }
 }
@@ -767,21 +773,21 @@ void ReadTempSensor() {
       
       tempCount++;
       
-      if (tempCount==27)
+      if (tempCount==NUM_TEMP_MODULES+1)
       {
           tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
             
           // Calculate Average Temperature  //
           j=0;                            // contains sum of temps
-          for (i = 0; i < 26; i++)
+          for (i = 0; i < NUM_TEMP_MODULES; i++)
           {
             j=j + state.tempsCelsius[i];
           }
-          state.avgTemp=j/26;
+          state.avgTemp=j/NUM_TEMP_MODULES;
 
           // Calculate Max Temperature //
           j=0;
-          for (i = 0; i < 26; i++)
+          for (i = 0; i < NUM_TEMP_MODULES; i++)
           {
             if (state.tempsCelsius[i] > j)
             {
