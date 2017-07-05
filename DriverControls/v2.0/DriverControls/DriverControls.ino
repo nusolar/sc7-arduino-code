@@ -13,7 +13,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG       = true;    // change to true to output debug info over serial
+const bool DEBUG       = false;    // change to true to output debug info over serial
 byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
@@ -452,13 +452,17 @@ void updateState() {
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
       state.tripped = true;
-      state.bmsStrobeOn = true;
+      state.bmsStrobeOn = true; 
+      Serial.print("Batteries are discharging, and the max temperature is ");
+      Serial.println(state.maxTemp);
     }
-  }
+  }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
       state.tripped = true;
       state.bmsStrobeOn = true;
+      Serial.print("Batteries are charging, and the max temperature is ");
+      Serial.println(state.maxTemp);
     }
   }
 
@@ -731,7 +735,7 @@ void ReadTempSensor() {
      ds.write(0xBE);         // Read Scratchpad
   
      //Serial.print("  Data = ");
-     //Serial.print(present, HEX);
+     //Serial.println(present, HEX);
      //Serial.print(" ");
      for ( i = 0; i < 9; i++) {           // we need 9 bytes
        data[i] = ds.read();
@@ -747,6 +751,10 @@ void ReadTempSensor() {
       // be stored to an "int16_t" type, which is always 16 bits
      // even when compiled on a 32 bit processor.
      int16_t raw = (data[1] << 8) | data[0];
+     /*Serial.print("RAW = ");
+     Serial.print(raw, HEX);
+     Serial.print(", ");
+     Serial.print(raw);*/
      if (type_s) {
        raw = raw << 3; // 9 bit resolution default
        if (data[7] == 0x10) {
@@ -761,15 +769,16 @@ void ReadTempSensor() {
         else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
         //// default is 12 bit resolution, 750 ms conversion time
      }
-  
       
-      state.celsius[tempCount-1] = (float)raw / 16.0;
+      //state.celsius[tempCount-1] = (float)raw / 16.0;
+      state.celsius[tempCount-1] = (float)(raw >> 4) + 5;
+      int blah;
+      blah = (int)(raw >> 4);
+      Serial.print("Int value: ");
+      Serial.println(blah);
+      Serial.print("Float value: ");
+      Serial.println(state.celsius[tempCount-1]);
       state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
-  
-      if (state.celsius[tempCount-1] > state.maxTemp)
-      {
-        state.maxTemp=state.celsius[tempCount-1];       //keep the maxTemp value updated
-      }
       
       tempCount++;
       
@@ -1082,6 +1091,8 @@ void loop() {
     loopSumTime = 0;
     loopCount = 0;
   }
+  Serial.print("Max Temp: ");
+            Serial.println(state.maxTemp);
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
