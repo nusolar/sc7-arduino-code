@@ -267,16 +267,16 @@ void readInputs() {
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
     // read gear
-    bool forward_on = (digitalRead(FORWARD_PIN) == LOW);
+    bool reverse_on = (digitalRead(REVERSE_PIN) == LOW);
     bool neutral_on = (digitalRead(NEUTRAL_PIN) == LOW);
     if (neutral_on) {
       state.gearRaw = NEUTRAL_RAW;
     }
-    else if (forward_on) {
-      state.gearRaw = FORWARD_RAW;
+    else if (reverse_on) {
+      state.gearRaw = REVERSE_RAW;
     }
     else {
-      state.gearRaw = REVERSE_RAW;
+      state.gearRaw = FORWARD_RAW;
     }
     
     // read lights
@@ -801,9 +801,9 @@ void ReadTempSensor() {
           }
           state.maxTemp=j;
       }
-      //Serial.print("Max Temp = ");
-      //Serial.println(state.maxTemp);    
+    
   }
+
 } 
 
   
@@ -824,7 +824,7 @@ void setup() {
   
   // init steering wheel inputs for use if we lose the steering wheel
   pinMode(NEUTRAL_PIN, INPUT_PULLUP);
-  pinMode(FORWARD_PIN, INPUT_PULLUP); 
+  pinMode(REVERSE_PIN, INPUT_PULLUP); 
   pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
@@ -1087,8 +1087,6 @@ void loop() {
     loopSumTime = 0;
     loopCount = 0;
   }
-  //Serial.print("Max Temp: ");
-  //          Serial.println(state.maxTemp);
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
