@@ -90,7 +90,7 @@ const bool NO_STEERING = false;    // set to true to read light, horn, gear cont
 
 // BMS parameters
 const float MAX_CURRENT_THRESH    = 68000; // mA
-const float CONTINUOUS_CURRENT_THRESH   = 50000; // current may exceed this value no more than 7 times in 50 ms
+const float CONTINUOUS_CURRENT_THRESH   = 65000; // current may exceed this value no more than 7 times in 50 ms
 const float CHARGE_CURRENT_THRESH       = 36000; // current limit for charging (36.4 to be exact)
 const int   CURRENT_BUFFER_SIZE         = 10;    // number of current values from BMS stored
 const int   OVERCURRENTS_ALLOWED        = 7;     // max number of overcurrent values allowed before trip
