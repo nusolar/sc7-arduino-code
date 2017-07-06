@@ -13,7 +13,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG       = false;    // change to true to output debug info over serial
+const bool DEBUG       = true;    // change to true to output debug info over serial
 byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
@@ -48,7 +48,7 @@ const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now sinc
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
-const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
+const uint16_t SW_HB_INTERVAL    = 5000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 150;   // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
@@ -796,9 +796,9 @@ void ReadTempSensor() {
           }
           state.maxTemp=j;
       }
-    
+      //Serial.print("Max Temp = ");
+      //Serial.println(state.maxTemp);    
   }
-
 } 
 
   
@@ -1082,8 +1082,8 @@ void loop() {
     loopSumTime = 0;
     loopCount = 0;
   }
-  Serial.print("Max Temp: ");
-            Serial.println(state.maxTemp);
+  //Serial.print("Max Temp: ");
+  //          Serial.println(state.maxTemp);
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
