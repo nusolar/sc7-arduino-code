@@ -13,7 +13,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG       = true;    // change to true to output debug info over serial
+const bool DEBUG       = false;    // change to true to output debug info over serial
 byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
@@ -263,16 +263,16 @@ void readInputs() {
   // read steering wheel controls if steering wheel disconnected
   if (state.altSteeringEnable) {
     // read gear
-    bool forward_on = (digitalRead(FORWARD_PIN) == LOW);
+    bool reverse_on = (digitalRead(REVERSE_PIN) == LOW);
     bool neutral_on = (digitalRead(NEUTRAL_PIN) == LOW);
     if (neutral_on) {
       state.gearRaw = NEUTRAL_RAW;
     }
-    else if (forward_on) {
-      state.gearRaw = FORWARD_RAW;
+    else if (reverse_on) {
+      state.gearRaw = REVERSE_RAW;
     }
     else {
-      state.gearRaw = REVERSE_RAW;
+      state.gearRaw = FORWARD_RAW;
     }
     
     // read lights
@@ -769,20 +769,15 @@ void ReadTempSensor() {
         else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
         //// default is 12 bit resolution, 750 ms conversion time
      }
-      float rawtemp = (float)(raw >> 4);
-      //state.celsius[tempCount-1] = (float)(raw >> 4) + 5; // offset to account for inaccuracy in the BPS temp testing method used in scrutineering
-      if(rawtemp > 85.00){
-        state.celsius[tempCount-1] = 0.0;
-      }
-      else{
-        state.celsius[tempCount-1] = rawtemp;
-      }
-      /*int blah;
+      
+      //state.celsius[tempCount-1] = (float)raw / 16.0;
+      state.celsius[tempCount-1] = (float)(raw >> 4) + 5;
+      int blah;
       blah = (int)(raw >> 4);
       Serial.print("Int value: ");
       Serial.println(blah);
       Serial.print("Float value: ");
-      Serial.println(state.celsius[tempCount-1]);*/
+      Serial.println(state.celsius[tempCount-1]);
       state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
       
       tempCount++;
@@ -810,9 +805,9 @@ void ReadTempSensor() {
           }
           state.maxTemp=j;
       }
-      //Serial.print("Max Temp = ");
-      //Serial.println(state.maxTemp);    
+    
   }
+
 } 
 
   
@@ -833,7 +828,7 @@ void setup() {
   
   // init steering wheel inputs for use if we lose the steering wheel
   pinMode(NEUTRAL_PIN, INPUT_PULLUP);
-  pinMode(FORWARD_PIN, INPUT_PULLUP); 
+  pinMode(REVERSE_PIN, INPUT_PULLUP); 
   pinMode(LEFT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(RIGHT_TURN_SW_PIN, INPUT_PULLUP);
   pinMode(HEADLIGHT_SW_PIN, INPUT_PULLUP);
@@ -1096,8 +1091,6 @@ void loop() {
     loopSumTime = 0;
     loopCount = 0;
   }
-  //Serial.print("Max Temp: ");
-  //          Serial.println(state.maxTemp);
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
