@@ -13,7 +13,7 @@
 
 //------------------------------CONSTANTS----------------------------//
 // debugging
-const bool DEBUG       = false;    // change to true to output debug info over serial
+const bool DEBUG       = true;    // change to true to output debug info over serial
 byte       debugStep   = 0;       // It's too slow to send out all the debug over serial at once, so we split it into 3 steps.
 const int  SERIAL_BAUD = 115200;  // baudrate for serial (maximum)
 
@@ -59,6 +59,7 @@ const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
 const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
+const uint16_t TEMP_SEND_INTERVAL = 500;   // interval for temp sense sending (over can)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -76,8 +77,9 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
-const float    CHARGE_TEMP         = 45.0;    // battery temp threshold when current is positive
-const float    DISCHARGE_TEMP      = 60.0;    // battery temp threshold when current is negative
+const uint8_t    NUM_TEMP_MODULES    = 26;    // Number of temperature sensors
+const uint8_t    CHARGE_TEMP         = 45;    // battery temp threshold when current is positive
+const uint8_t    DISCHARGE_TEMP      = 60;    // battery temp threshold when current is negative
 
 // steering wheel parameters
 const byte NEUTRAL_RAW = 0x03;
@@ -192,10 +194,10 @@ struct CarState {
   uint32_t bmsErrorFlags; // keep track of error flags from BMS (for bms led strobe)
 
   //temperature
-  float celsius[26];
-  float fahrenheit[26];
-  float maxTemp;
-  float avgTemp;
+  uint8_t tempsCelsius[32];
+  uint8_t tempsFahrenheit[32];
+  uint8_t maxTemp;
+  uint8_t avgTemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -219,6 +221,7 @@ Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
 Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
+Metro tempSendTimer(TEMP_SEND_INTERVAL);      // timer for reading the values from temp sensorss
 
 // debugging variables
 long loopStartTime = 0;
@@ -226,10 +229,11 @@ long loopSumTime = 0;
 int loopCount = 0;
 
 //temp sense
-byte tempCount;    // keeps track of how many times readTempSensor() has run
+byte tempCount = 0;    // keeps track of how many times readTempSensor() has run
+byte tempSendCount = 0; // keeps track of which temp packet to send out over can
 byte addr[8];
 
-byte i;            // just used as a counter variable to print out ALL temperatures in the serial debug section
+byte i;          // just used as a counter variable to print out ALL temperatures in the serial debug section
 float j;         // used as a counter when calculating Avg and Max temperatures
 
 //--------------------------HELPER FUNCTIONS--------------------------//
@@ -610,10 +614,7 @@ void writeCAN() {
     
     // create and send packet
     bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
-
-    //Serial.println("Sending DC_Drive: ");
-    //Serial.print(trysend);
-    
+   
     // reset timer
     if (trysend) 
       dcDriveTimer.reset();
@@ -635,29 +636,31 @@ void writeCAN() {
     /*DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
                             state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
                             ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
-                            state.gear, state.ignition);
-                        
-    bool trysend = canControl.Send(packet, TXBANY);*/
+                            state.gear, state.ignition); */
 
-    bool trysend = canControl.SendVerified(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged, state.canErrorFlags, state.dcErrorFlags, state.wasReset,
+    canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged, state.canErrorFlags, state.dcErrorFlags, state.wasReset,
                                             ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition, state.tripped),
                                     TXBANY);
-
-    //Serial.println("Sending DC_Info: ");
-    //Serial.print(trysend);
-
-    // reset timer
-    if (trysend) 
-      dcInfoTimer.reset();
-    
+    dcInfoTimer.reset();
     state.wasReset = false; // clear reset    
   }
   
   if (dcPowerTimer.expired()) {
-    bool trysend = canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
-    
-    if (trysend) 
-      dcPowerTimer.reset();
+    canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
+    dcPowerTimer.reset();
+  }
+
+  if (tempSendTimer.check())
+  {
+    switch (tempSendCount) {
+      case 0: canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsCelsius),TXBANY); break; // send first 6 temps + min and average
+      case 1: canControl.Send(DC_Temp_1(state.tempsCelsius+6),TXBANY); break;                            // temps 7 - 14
+      case 2: canControl.Send(DC_Temp_2(state.tempsCelsius+14),TXBANY); break;                           // temps 15 - 22
+      case 3: canControl.Send(DC_Temp_3(state.tempsCelsius+22),TXBANY); break;                           // temps 23 - 26
+    }
+
+    tempSendCount = (tempSendCount + 1) % 4;
+    // Don't reset yet because then the temperature sensor code will never see the timer expired.
   }
 }
 
@@ -769,38 +772,31 @@ void ReadTempSensor() {
         else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
         //// default is 12 bit resolution, 750 ms conversion time
      }
-      
-      //state.celsius[tempCount-1] = (float)raw / 16.0;
-      state.celsius[tempCount-1] = (float)(raw >> 4) + 5;
-      int blah;
-      blah = (int)(raw >> 4);
-      Serial.print("Int value: ");
-      Serial.println(blah);
-      Serial.print("Float value: ");
-      Serial.println(state.celsius[tempCount-1]);
-      state.fahrenheit[tempCount-1] = state.celsius[tempCount-1] * 1.8 + 32.0;
+
+      state.tempsCelsius[tempCount-1] = (raw >> 4) + 5;
+      state.tempsFahrenheit[tempCount-1] = (uint8_t)(state.tempsCelsius[tempCount-1] * 1.8 + 32.0);
       
       tempCount++;
       
-      if (tempCount==27)
+      if (tempCount>=NUM_TEMP_MODULES+1)
       {
           tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
             
           // Calculate Average Temperature  //
           j=0;                            // contains sum of temps
-          for (i = 0; i < 26; i++)
+          for (i = 0; i < NUM_TEMP_MODULES; i++)
           {
-            j=j + state.celsius[i];
+            j=j + state.tempsCelsius[i];
           }
-          state.avgTemp=j/26;
+          state.avgTemp=j/NUM_TEMP_MODULES;
 
           // Calculate Max Temperature //
           j=0;
-          for (i = 0; i < 26; i++)
+          for (i = 0; i < NUM_TEMP_MODULES; i++)
           {
-            if (state.celsius[i] > j)
+            if (state.tempsCelsius[i] > j)
             {
-              j=state.celsius[i];
+              j=state.tempsCelsius[i];
             }
           }
           state.maxTemp=j;
@@ -1067,9 +1063,9 @@ void loop() {
             for (i = 0; i < 26; i++)
             {
                Serial.print("Temperature = ");
-               Serial.print(state.celsius[i]);
+               Serial.print(state.tempsCelsius[i]);
                Serial.print(" Celsius, ");
-               Serial.print(state.fahrenheit[i]);
+               Serial.print(state.tempsFahrenheit[i]);
                Serial.println(" Fahrenheit");
             }
             Serial.print("Average Temp: ");
