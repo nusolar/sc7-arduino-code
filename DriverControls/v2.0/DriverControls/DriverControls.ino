@@ -59,6 +59,7 @@ const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
 const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
+const uint16_t TEMP_SEND_INTERVAL = 500;   // interval for temp sense sending (over can)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -220,6 +221,7 @@ Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
 Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
+Metro tempSendTimer(TEMP_SEND_INTERVAL);      // timer for reading the values from temp sensorss
 
 // debugging variables
 long loopStartTime = 0;
@@ -227,10 +229,11 @@ long loopSumTime = 0;
 int loopCount = 0;
 
 //temp sense
-byte tempCount;    // keeps track of how many times readTempSensor() has run
+byte tempCount = 0;    // keeps track of how many times readTempSensor() has run
+byte tempSendCount = 0; // keeps track of which temp packet to send out over can
 byte addr[8];
 
-byte i;            // just used as a counter variable to print out ALL temperatures in the serial debug section
+byte i;          // just used as a counter variable to print out ALL temperatures in the serial debug section
 float j;         // used as a counter when calculating Avg and Max temperatures
 
 //--------------------------HELPER FUNCTIONS--------------------------//
@@ -647,14 +650,16 @@ void writeCAN() {
     dcPowerTimer.reset();
   }
 
-  if (tempReadTimer.expired())
+  if (tempSendTimer.check())
   {
-    switch (tempCount) {
-      case 0: canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsFahrenheit),TXBANY); break; // send first 6 temps + min and average
-      case 1: canControl.Send(DC_Temp_1(state.tempsFahrenheit+6),TXBANY); break;                            // temps 7 - 14
-      case 2: canControl.Send(DC_Temp_2(state.tempsFahrenheit+14),TXBANY); break;                           // temps 15 - 22
-      case 3: canControl.Send(DC_Temp_3(state.tempsFahrenheit+22),TXBANY); break;                           // temps 23 - 26
+    switch (tempSendCount) {
+      case 0: canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsCelsius),TXBANY); break; // send first 6 temps + min and average
+      case 1: canControl.Send(DC_Temp_1(state.tempsCelsius+6),TXBANY); break;                            // temps 7 - 14
+      case 2: canControl.Send(DC_Temp_2(state.tempsCelsius+14),TXBANY); break;                           // temps 15 - 22
+      case 3: canControl.Send(DC_Temp_3(state.tempsCelsius+22),TXBANY); break;                           // temps 23 - 26
     }
+
+    tempSendCount = (tempSendCount + 1) % 4;
     // Don't reset yet because then the temperature sensor code will never see the timer expired.
   }
 }
@@ -773,7 +778,7 @@ void ReadTempSensor() {
       
       tempCount++;
       
-      if (tempCount==NUM_TEMP_MODULES+1)
+      if (tempCount>=NUM_TEMP_MODULES+1)
       {
           tempCount=0;      //reset count after tempCount has cycled thru all 26 sensors
             
