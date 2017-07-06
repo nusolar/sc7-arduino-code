@@ -48,7 +48,7 @@ const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now sinc
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
-const uint16_t SW_HB_INTERVAL    = 1000;  // steering wheel heartbeat
+const uint16_t SW_HB_INTERVAL    = 5000;  // steering wheel heartbeat
 const uint16_t BMS_HB_INTERVAL   = 1000;  // bms heartbeat
 const uint16_t DC_DRIVE_INTERVAL = 150;   // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
