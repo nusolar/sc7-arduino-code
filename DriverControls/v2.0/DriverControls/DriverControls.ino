@@ -196,6 +196,7 @@ struct CarState {
   float fahrenheit[26];
   float maxTemp;
   float avgTemp;
+  float previousValidTemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -770,12 +771,17 @@ void ReadTempSensor() {
         //// default is 12 bit resolution, 750 ms conversion time
      }
       float rawtemp = (float)(raw >> 4);
+      if(previousValidTemp == -1) //On first run
+      {
+        previousValidTemp = rawTemp;
+      }
       //state.celsius[tempCount-1] = (float)(raw >> 4) + 5; // offset to account for inaccuracy in the BPS temp testing method used in scrutineering
-      if(rawtemp > 85.00){
+      if(rawtemp > previousValidTemp + 5 || rawtemp < previousValidTemp - 5){ // Catch large random spikes in temperature sensor 
         state.celsius[tempCount-1] = 0.0;
       }
       else{
         state.celsius[tempCount-1] = rawtemp;
+        previousValidTemp = rawtemp; 
       }
       /*int blah;
       blah = (int)(raw >> 4);
@@ -860,6 +866,9 @@ void setup() {
   }
   state.tripped = false;
   state.bmsStrobeOn = false;
+
+  // init valid temperature
+  state.previousValidTemp = -1;
     
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL| ( WDT_INTERVAL << 16 ));
@@ -1101,4 +1110,3 @@ void loop() {
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
-
