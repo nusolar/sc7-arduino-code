@@ -43,7 +43,7 @@ char old;          //old is the previous switch states
 const int V = 6;      //velocity (from CAN)
 const int GEAR = 13;  //forward/reverse/neutral
 const int LT = 8;    //lap timer
-const int LIGHT = 11; //headlights/hazardlights/no lights
+const int LIGHT = 13; //headlights/no lights
 const int RIGHT = 15; //right turn signals
 const int LEFT = 1;   //left turn signals
 const int TELM = 0;   //telemetry indicator
@@ -193,7 +193,7 @@ void setup() {
 #endif
 
   // Enable WDT to 500 ms timeout
-  wdt_enable(WDTO_4S);
+  wdt_enable(WDTO_500MS);
 
   //Initialize turnsignal_on state
   steering_wheel.turnsignal_on = false;
@@ -268,11 +268,11 @@ inline void defaultdisplay() {
   screen.print(steering_wheel.Lightsdisplay);
   screen.setCursor(2, TELM);
   screen.print(steering_wheel.telemetrydisplay);
-  if (steering_wheel.LTdisplay || steering_wheel.Lightsdisplay == "HZ") {
+  if (steering_wheel.LTdisplay || ~young & HAZARDLIGHT) {
     blnk(LEFT, steering_wheel.turnsignal_on);
   }
 
-  if (steering_wheel.RTdisplay || steering_wheel.Lightsdisplay == "HZ") {
+  if (steering_wheel.RTdisplay || ~young & HAZARDLIGHT) {
     blnk(RIGHT, steering_wheel.turnsignal_on);
   }
 
@@ -391,20 +391,14 @@ void loop() {
       steering_wheel.notification = String("Reverse Gear");
       notif_timer.reset();
     }
-
-    if ((~young & HEADLIGHT) && steering_wheel.Lightsdisplay != "H ") {
+    else if ((~young & HEADLIGHT) && steering_wheel.Lightsdisplay != "H ") {
       steering_wheel.Lightsdisplay = "H ";
-      steering_wheel.notification = String("Headlights");
+      steering_wheel.notification = String("Headlights On");
       notif_timer.reset();
     }
-    if ((~young & HAZARDLIGHT) && steering_wheel.Lightsdisplay != "HZ") {
-      steering_wheel.Lightsdisplay = "HZ";
-      steering_wheel.notification = String("Hazardlights");
-      notif_timer.reset();
-    }
-    if (!(~young & (HAZARDLIGHT | HEADLIGHT)) && steering_wheel.Lightsdisplay != "  ") {
+    else if (!(~young & HEADLIGHT) && steering_wheel.Lightsdisplay != "  ") {
       steering_wheel.Lightsdisplay = "  ";
-      steering_wheel.notification = String("All lights off");
+      steering_wheel.notification = String("Headlights Off");
       notif_timer.reset();
     }
 
@@ -583,6 +577,7 @@ void loop() {
 */
 void checkProgrammingMode()
 {
+  /* DEPRECATED 7/2017
   while (digitalRead(hzp) == LOW)
   {
     //Do nothing if hazards is on, allowing programming to happen.
@@ -593,6 +588,7 @@ void checkProgrammingMode()
     screen.update();
     delay(500);
   }
+  */
 }
 
 inline void initializePins()
