@@ -773,7 +773,7 @@ void ReadTempSensor() {
         //// default is 12 bit resolution, 750 ms conversion time
      }
 
-      state.tempsCelsius[tempCount-1] = (raw >> 4) + 5;
+      state.tempsCelsius[tempCount-1] = (raw >> 4);
       state.tempsFahrenheit[tempCount-1] = (uint8_t)(state.tempsCelsius[tempCount-1] * 1.8 + 32.0);
       
       tempCount++;
