@@ -54,6 +54,7 @@ const uint16_t DC_DRIVE_INTERVAL = 150;   // drive command packet
 const uint16_t DC_INFO_INTERVAL  = 150;   // driver controls info packet
 const uint16_t DC_HB_INTERVAL    = 1000;  // driver controls heartbeat packet
 const uint16_t DC_POWER_INTERVAL = 1000;  // driver controls power packet
+const uint16_t DC_STATUS_INTERVAL= 500;   // driver controls status packets
 const uint16_t WDT_INTERVAL      = 5000;  // watchdog timer
 const uint16_t TOGGLE_INTERVAL   = 500;   // toggle interval for right/left turn signals, hazards
 const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
@@ -181,7 +182,13 @@ struct CarState {
   // gearing and ignition
   GearState gear;         // brake, foward, reverse, regen, neutral
   IgnitionState ignition; // start, run, park
-  bool tripped;           // flag for overcurrent  
+  uint8_t tripFlag;       // flag for overcurrent 
+  /*  DC_Status::F_CHARGING_OVER_TEMP       = 0x01;
+      DC_Status::F_DISCHARGING_OVER_TEMP    = 0x02;
+      DC_Status::F_CHARGING_OVER_CURRENT    = 0x04;
+      DC_Status::F_DISCHARGING_OVER_CURRENT = 0x08;
+      DC_Status::F_NO_TRIP                  = 0x00;  */
+      #define TRIP_FROM_BMS                   0x80
   
   // outputs
   bool rightTurnOn;   // true if we should turn rt signal on
@@ -209,15 +216,16 @@ CarState state;
 
 // timers
 Metro mcHbTimer(MC_HB_INTERVAL);       // motor controller heartbeat
-Metro swHbTimer(SW_HB_INTERVAL);       // steering wheel heartbeat
-Metro bmsHbTimer(BMS_HB_INTERVAL);     // bms heartbeat
-Metro dcDriveTimer(DC_DRIVE_INTERVAL); // motor controller send packet
-Metro dcInfoTimer(DC_INFO_INTERVAL);   // steering wheel send packet
-Metro dcHbTimer(DC_HB_INTERVAL);       // driver controls heartbeat
-Metro hazardsTimer(TOGGLE_INTERVAL);   // timer for toggling hazards
-Metro rightTurnTimer(TOGGLE_INTERVAL); // timer for toggling right turn signal
-Metro leftTurnTimer(TOGGLE_INTERVAL);  // timer for toggling left turn signal
-Metro debugTimer(DEBUG_INTERVAL);      // timer for debug output over serial
+Metro swHbTimer(SW_HB_INTERVAL);         // steering wheel heartbeat
+Metro bmsHbTimer(BMS_HB_INTERVAL);       // bms heartbeat
+Metro dcDriveTimer(DC_DRIVE_INTERVAL);   // motor controller send packet
+Metro dcInfoTimer(DC_INFO_INTERVAL);     // Info packet to BMS and Steering Wheel
+Metro dcHbTimer(DC_HB_INTERVAL);         // driver controls heartbeat
+Metro dcStatusTimer(DC_STATUS_INTERVAL); // driver controls status packets
+Metro hazardsTimer(TOGGLE_INTERVAL);     // timer for toggling hazards
+Metro rightTurnTimer(TOGGLE_INTERVAL);   // timer for toggling right turn signal
+Metro leftTurnTimer(TOGGLE_INTERVAL);    // timer for toggling left turn signal
+Metro debugTimer(DEBUG_INTERVAL);        // timer for debug output over serial
 Metro dcPowerTimer(DC_POWER_INTERVAL);
 Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
 Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
@@ -455,7 +463,7 @@ void updateState() {
   // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
-      state.tripped = true;
+      state.tripFlag = DC_Status::F_DISCHARGING_OVER_TEMP;
       state.bmsStrobeOn = true; 
       Serial.print("Batteries are discharging, and the max temperature is ");
       Serial.println(state.maxTemp);
@@ -463,7 +471,7 @@ void updateState() {
   }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
-      state.tripped = true;
+      state.tripFlag = DC_Status::F_CHARGING_OVER_TEMP;
       state.bmsStrobeOn = true;
       Serial.print("Batteries are charging, and the max temperature is ");
       Serial.println(state.maxTemp);
@@ -472,15 +480,15 @@ void updateState() {
 
   // bms strobe light trip conditions
   if(state.bmsErrorFlags & BMS_Status_Ext::F_OVERVOLTAGE){
-    state.tripped = true;
+    state.tripFlag = TRIP_FROM_BMS;
     state.bmsStrobeOn = true;
   }
   if(state.bmsErrorFlags & BMS_Status_Ext::F_UNDERVOLTAGE){
-    state.tripped = true;
+    state.tripFlag = TRIP_FROM_BMS;
     state.bmsStrobeOn = true;
   }
   if(state.bmsErrorFlags & BMS_Status_Ext::F_DRVCTRLSLOST){
-    state.tripped = true;
+    state.tripFlag = TRIP_FROM_BMS;
     state.bmsStrobeOn = true;
   }
   
@@ -521,7 +529,7 @@ void updateState() {
   {
     // charging current check
     if (state.bmsCurrent > 0.0 && state.bmsCurrent >= CHARGE_CURRENT_THRESH){
-      state.tripped = true;
+      state.tripFlag = DC_Status::F_CHARGING_OVER_CURRENT;
       state.bmsStrobeOn = true;
     }
     // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
@@ -543,9 +551,8 @@ void updateState() {
     //Check for a current trip condition
     if (absBMSCurrent >= MAX_CURRENT_THRESH ||
         state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
-      state.tripped = true;
+      state.tripFlag = DC_Status::F_DISCHARGING_OVER_CURRENT;
       state.bmsStrobeOn = true;
-      state.dcErrorFlags |= BMS_OVER_CURR;
     }
 
     //Finally mark this update request handled
@@ -553,7 +560,7 @@ void updateState() {
   }
   
   // update ignition state
-  if (state.tripped) { // kill car
+  if (state.tripFlag) { // kill car
     state.ignition = Ignition_Park;
   }
   else {
@@ -586,7 +593,7 @@ void writeOutputs() {
  */
 void writeCAN() {
   // see if motor controller packet needs to be sent
-  if (dcDriveTimer.expired() && !state.tripped) { // ready to send drive command
+  if (dcDriveTimer.expired() && !state.tripFlag) { // ready to send drive command
     // determine velocity, current
     float MCvelocity, MCcurrent;
     switch (state.gear) {
@@ -612,7 +619,7 @@ void writeCAN() {
       break;
     }
     
-    // create and send packet
+    // create and send motor control packet
     bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
    
     // reset timer
@@ -632,15 +639,13 @@ void writeCAN() {
 
   // check if driver controls info packet needs to be sent
   if (dcInfoTimer.expired()) {
-    // create and send packet
-    /*DC_Info packet(state.accelRatio, state.regenRatio, state.brakeEngaged,
-                            state.canErrorFlags, state.dcErrorFlags, state.wasReset, 
-                            ((state.ignition != Ignition_Park) ? true : false), // fuel door, which we use to control the BMS since the ignition switch doesn't work.
-                            state.gear, state.ignition); */
-
+    // create and send Info packet
     canControl.Send(DC_Info(state.accelRatio, state.regenRatio, state.brakeEngaged, state.canErrorFlags, state.dcErrorFlags, state.wasReset,
-                                            ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition, state.tripped),
+                                            ((state.ignition != Ignition_Park) ? true : false), state.gear, state.ignition, (bool)state.tripFlag),
                                     TXBANY);
+    // create and send status packet (with tripped flags)
+    canControl.Send(DC_Status(state.tripFlag), TXBANY);
+
     dcInfoTimer.reset();
     state.wasReset = false; // clear reset    
   }
@@ -648,6 +653,12 @@ void writeCAN() {
   if (dcPowerTimer.expired()) {
     canControl.Send(DC_Power(MAX_MOTOR_CURRENT), TXBANY);
     dcPowerTimer.reset();
+  }
+
+  if (dcStatusTimer.expired()) {
+    // create and send status packet (with tripped flags)
+    canControl.Send(DC_Status(state.tripFlag), TXBANY);
+    dcStatusTimer.reset();
   }
 
   if (tempSendTimer.check())
@@ -774,6 +785,10 @@ void ReadTempSensor() {
      }
 
       state.tempsCelsius[tempCount-1] = (raw >> 4);
+      if (state.tempsCelsius[tempCount-1] >= 84) 
+      { 
+        state.tempsCelsius[tempCount-1] = 0;
+      }
       state.tempsFahrenheit[tempCount-1] = (uint8_t)(state.tempsCelsius[tempCount-1] * 1.8 + 32.0);
       
       tempCount++;
@@ -849,7 +864,7 @@ void setup() {
   for (int i = 0; i < CURRENT_BUFFER_SIZE; i++) {
     state.currentBuffer[i] = 0;
   }
-  state.tripped = false;
+  state.tripFlag = false;
   state.bmsStrobeOn = false;
     
   // set the watchdog timer interval
@@ -1003,8 +1018,8 @@ void loop() {
         Serial.println(state.regenRatio);
         Serial.print("Regen current: ");
         Serial.println(state.regenCurrent);
-        Serial.print("Car tripped: ");
-        Serial.println(state.tripped ? "YES" : "NO");
+        Serial.print("Trip Flag: ");
+        Serial.println(state.tripFlag,HEX);
         break;
       case 1:
         Serial.print("Ignition: ");
