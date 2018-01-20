@@ -43,8 +43,10 @@ const uint16_t RXF1      = BMS_VOLT_CURR_ID; // Can't put 0 here, otherwise it w
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF2      = SW_DATA_ID;
 const uint16_t RXF3      = BMS_STATUS_EXT_ID;
-const uint16_t RXF4      = MC_VELOCITY_ID;
-const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
+const uint32_t RXF4      = MTBA_FRAME0_REAR_LEFT_ID;
+const uint32_t RXF5      = MTBA_FRAME0_REAR_RIGHT_ID;
+//const uint16_t RXF4      = MC_VELOCITY_ID;
+//const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
@@ -61,6 +63,7 @@ const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
 const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
 const uint16_t TEMP_SEND_INTERVAL = 500;   // interval for temp sense sending (over can)
+const uint16_t MTBA_SEND_INTERVAL = 1000;   // interval for when to send a request
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -74,6 +77,7 @@ const float    REVERSE_VELOCITY    = -100.0f; // velocity to use if reverse
 const float    MAX_MOTOR_CURRENT   = 1.0;     // sent to the motor to set the maximum amount of current to draw
 const float    GEAR_CHANGE_CUTOFF  = 5.0f;    // cannot change gear unless velocity is below this threshold
 const float    M_PER_SEC_TO_MPH    = 2.237f;  // conversion factor from m/s to mph
+const float    REV_PER_MIN_TO_MPH  = 0.57119866428f; //conversion factor from revolutions/min to mph, diameter = 16 inches
 const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CAN packets per loop
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
@@ -230,6 +234,7 @@ Metro dcPowerTimer(DC_POWER_INTERVAL);
 Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
 Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
 Metro tempSendTimer(TEMP_SEND_INTERVAL);      // timer for reading the values from temp sensorss
+Metro mtbaRequestTimer(MTBA_SEND_INTERVAL);   // timer for sending requests
 
 // debugging variables
 long loopStartTime = 0;
@@ -312,10 +317,10 @@ void readCAN() {
       bmsHbTimer.reset();
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sx00) == MC_BASEADDRESS) { // source is mc
+   /** else if ((f.id & MASK_Sx00) == MC_BASEADDRESS) { // source is mc
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
-    }
+    }**/
     else if ((f.id & MASK_Sx00) == SW_BASEADDRESS) { // source is sw
       swHbTimer.reset();
       state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
@@ -323,7 +328,7 @@ void readCAN() {
     }
     
     // check for specific packets
-    if (f.id == MC_BUS_STATUS_ID) { // motor controller bus status
+   /** if (f.id == MC_BUS_STATUS_ID) { // motor controller bus status
       MC_BusStatus packet(f);
       state.busCurrent = packet.bus_current;
     }
@@ -331,6 +336,16 @@ void readCAN() {
       MC_Velocity packet(f);
       state.motorVelocity = packet.motor_velocity;
       state.carVelocity = packet.car_velocity * M_PER_SEC_TO_MPH;
+    }**/
+    else if (f.id == MTBA_FRAME0_REAR_LEFT_ID) { // motor controller velocity
+      MTBA_F0_RLeft packet(f);
+      state.motorVelocity = packet.motor_rotating_speed;
+      state.carVelocity = packet.motor_rotating_speed * REV_PER_MIN_TO_MPH;
+    }
+    else if (f.id == MTBA_FRAME0_REAR_RIGHT_ID) { // motor controller velocity
+      MTBA_F0_RRight packet(f);
+      state.motorVelocity = packet.motor_rotating_speed;
+      state.carVelocity = packet.motor_rotating_speed * REV_PER_MIN_TO_MPH;
     }
     else if (f.id == BMS_SOC_ID) { // bms state of charge
       BMS_SOC packet(f);
@@ -493,7 +508,7 @@ void updateState() {
   }
   
   // update cruise control state
-  //if (!state.cruiseCtrlPrev && state.cruiseCtrl) { // cruise control just switched on
+  //if (!state.cruiseCtrlPrev && state.cruiseCtrl) { // cruise control just switfched on
   //  state.cruiseCtrlOn = true;
   //  state.cruiseCtrlRatio = state.accelRatio;
   //}
@@ -672,6 +687,17 @@ void writeCAN() {
 
     tempSendCount = (tempSendCount + 1) % 4;
     // Don't reset yet because then the temperature sensor code will never see the timer expired.
+  }
+
+  if (mtbaRequestTimer.expired()){
+    // send a request
+    canControl.Send(MTBA_ReqCommRLeft(1, 0, 0), TXBANY);
+    canControl.Send(MTBA_ReqCommRLeft(0, 1, 0), TXBANY);
+    canControl.Send(MTBA_ReqCommRLeft(0, 0, 1), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(1, 0, 0), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(0, 1, 0), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(0, 0, 1), TXBANY);
+    mbtaRequestTimer.reset();
   }
 }
 
@@ -880,6 +906,7 @@ void setup() {
   debugTimer.reset();
   tempConvertTimer.reset();
   tempReadTimer.reset();
+  mtbaRequestTimer.reset(); 
 
   
   // setup CAN
