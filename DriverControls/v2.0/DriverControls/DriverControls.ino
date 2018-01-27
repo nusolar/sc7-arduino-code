@@ -33,7 +33,7 @@ const byte BOARDLED       = 13;
 const byte BMS_STROBE_PIN = 48;
 
 // CAN parameters
-const uint16_t BAUD_RATE = 1000;
+const uint16_t BAUD_RATE = 500;
 const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sxxx;
@@ -691,13 +691,13 @@ void writeCAN() {
 
   if (mtbaRequestTimer.expired()){
     // send a request
-    canControl.Send(MTBA_ReqCommRLeft(1, 0, 0), TXBANY);
-    canControl.Send(MTBA_ReqCommRLeft(0, 1, 0), TXBANY);
-    canControl.Send(MTBA_ReqCommRLeft(0, 0, 1), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(1, 0, 0), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(0, 1, 0), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(0, 0, 1), TXBANY);
-    mbtaRequestTimer.reset();
+    canControl.Send(MTBA_ReqCommRLeft(1), TXBANY);
+    canControl.Send(MTBA_ReqCommRLeft(2), TXBANY);
+    canControl.Send(MTBA_ReqCommRLeft(4), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(1), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(2), TXBANY);
+    canControl.Send(MTBA_ReqCommRRight(4), TXBANY);
+    mtbaRequestTimer.reset();
   }
 }
 
