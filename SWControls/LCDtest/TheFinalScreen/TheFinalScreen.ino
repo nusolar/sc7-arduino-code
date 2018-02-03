@@ -86,27 +86,49 @@ Metro telmetry_timer = Metro(2500);
 //CAN parameters --> check these, may be diff
 const byte     CAN_CS    = 10;
 const byte     CAN_INT   = 2; // Interrupt #1
-const uint16_t CAN_BAUD_RATE = 1000;
+const uint16_t CAN_BAUD_RATE = 500;
 const byte     CAN_FREQ      = 16;
 uint16_t errors;
 
 CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); //Try initializing without interrupts for now
 
 //Indicators:
-int SPEED = 0;;
-String ERROR = "CAR MISSING";
-double BAT_CURRENT = 0;
-double MIN_BAT = 0;
-double ARRAY_CURRENT = 0; 
-double MAX_TEMPERATURE = 0;
-boolean LEFT_LIGHT = false;
-boolean RIGHT_LIGHT = false;
-boolean HAZARD_LIGHT = false;
-boolean BRAKES = false;
+float VELOC;
+float BAT_CURRENT;
+float MIN_BAT;
+float ARRAY_CURRENT;
+float MAX_TEMPERATURE;
 
+String HAZARD_LIGHT;
+boolean LEFT_LIGHT;
+boolean RIGHT_LIGHT;
+boolean BRAKES;
+String Err;
+
+//Declaring Functions
+void interface();
+void setup();
+void loop ();
 
 RA8875 tft = RA8875(RA8875_CS, RA8875_RESET);
 uint16_t tx, ty;
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  tft.begin(RA8875_800x480);
+  tft.touchBegin(RA8875_INT);
+  delay(3000);  //Allow LCD and MCP2515 to fully boot (Not sure what actual value to use with the new LCD).
+  interface();
+
+  CanControl.filters.setRB0(MASK_Sxxx, BMS_VOLT_CURR_ID, DC_TEMP_0_ID);
+  CanControl.filters.setRB1(MASK_Sxxx, MTBA_FRAME0_REAR_LEFT_ID, DC_INFO_ID, 0); //**MC_VELOCITY_ID, **MC_PHASE_ID
+  CanControl.Setup(RX0IE | RX1IE);
+
+// Insert DEBUG and LOOPBACK steps
+  
+}
+
 void interface() {
  tft.setBackgroundColor(RA8875_BLACK);
  tft.drawRect(5,5,390, 195, RA8875_WHITE);
@@ -120,7 +142,7 @@ void interface() {
  tft.print("Speed: ");
  tft.setCursor(180,70);
  tft.setFontScale(5);
- tft.print(SPEED);
+ tft.print(VELOC);
  tft.setCursor(335,160);
  tft.setFontScale(1);
  tft.print("mph");
@@ -179,15 +201,68 @@ void interface() {
  tft.print(ERROR);
 }
 
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  tft.begin(RA8875_800x480);
-  tft.touchBegin(RA8875_INT);
-  interface();
+void loop()  {
+    // Fetch any potential messages from the MCP2515
+    CanControl.Fetch();
+    
+    if (CanControl.Available()) {
+
+    // Use available CAN packets to assign values to appropriate members of the data structures
+    Frame& f = CanControl.Read();
+#ifdef DEBUG
+    Serial.print("Received: " );
+    Serial.println(f.id, HEX);
+#endif
+    switch (f.id)
+    {
+      case BMS_VOLT_CURR_ID:
+        {
+          BMS_VoltageCurrent packet(f); //Get the voltage and current of the battery pack
+          steering_wheel.BCurrentdisplay = packet.current / 1000.0;
+          steering_wheel.BVoltagedisplay = packet.voltage / 1000.0;
+          CAN_RX.reset();
+          break;
+        }
+      case MTBA_FRAME0_REAR_LEFT_ID:
+        {
+          MTBA_F0_RLEFT packet(f);
+          VELOC = motor_rotating_speed * MPS_TO_MPH;
+          CAN_RX.reset();
+          break;
+        }
+      case DC_TEMP_0_ID:
+        {
+          DC_Temp_0 packet(f); // Get Max Pack Temp
+          steering_wheel.MaxTempdisplay = packet.max_temp;
+          CAN_RX.reset();
+          break;
+        }
+      case DC_INFO_ID:
+        {
+          DC_Info packet(f); // Get Tripped state of vehicle
+          steering_wheel.tripped = packet.tripped;
+          if (steering_wheel.tripped) {
+            steering_wheel.notification = GENERIC_TRIP_STR;
+            notif_timer.reset();
+          }
+          CAN_RX.reset();
+          break;
+        }
+      /*case BMS_STATUS_EXT_ID:
+        {
+        BMS_Status_Ext packet(f); // extract the flags
+        if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); steering_wheel.notification = BMS_OVVOLTAGE_STR;}
+        else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); steering_wheel.notification = BMS_UNVOLTAGE_STR;}
+        else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); steering_wheel.notification = BMS_12VERR_STR;}
+        CAN_RX.reset();
+        break;
+        }*/
+      case TEL_HEARTBEAT_ID:
+        {
+          steering_wheel.telemetrydisplay = 'T';
+          telmetry_timer.reset();
+        }
+    }
+  }
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-
-}
