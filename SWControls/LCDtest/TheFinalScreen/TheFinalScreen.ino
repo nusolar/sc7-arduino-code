@@ -39,7 +39,7 @@ char young = 0xFF; //young is continuously assigned to the new switch states
 char old;          //old is the previous switch states
 
 //Conversion data for displayed measurements
-#define MPS_TO_MPH 2.2369f
+#define RPM_TO_MPH 2.2369f //Change for correct values, diameter 19 inch
 
 //BMS Error Strings
 #define BMS_12VERR_STR              String("TRIP: 12V ERR")
@@ -223,10 +223,10 @@ void loop()  {
           CAN_RX.reset();
           break;
         }
-      case MTBA_FRAME0_REAR_LEFT_ID:
+      case MTBA_FRAME0_REAR_LEFT_ID: //19 inch diameter of wheels, figure out conversion factor
         {
           MTBA_F0_RLEFT packet(f);
-          VELOC = motor_rotating_speed * MPS_TO_MPH;
+          VELOC = motor_rotating_speed * RPM_TO_MPH;
           CAN_RX.reset();
           break;
         }
