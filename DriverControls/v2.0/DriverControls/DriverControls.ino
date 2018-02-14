@@ -33,7 +33,7 @@ const byte BOARDLED       = 13;
 const byte BMS_STROBE_PIN = 48;
 
 // CAN parameters
-const uint16_t BAUD_RATE = 500;
+const uint16_t BAUD_RATE = 250;
 const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sxxx;
