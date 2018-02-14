@@ -64,7 +64,7 @@ const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
 const uint16_t TEMP_SEND_INTERVAL = 500;   // interval for temp sense sending (over can)
 const uint16_t MTBA_SEND_INTERVAL = 1000;   // interval for when to send a request
-
+uint16_t counter =1;
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
 const float    MAX_ACCEL_RATIO     = 0.8;     // maximum safe accel ratio
@@ -691,12 +691,26 @@ void writeCAN() {
 
   if (mtbaRequestTimer.expired()){
     // send a request
-    canControl.Send(MTBA_ReqCommRLeft(1), TXBANY);
-    canControl.Send(MTBA_ReqCommRLeft(2), TXBANY);
-    canControl.Send(MTBA_ReqCommRLeft(4), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(1), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(2), TXBANY);
-    canControl.Send(MTBA_ReqCommRRight(4), TXBANY);
+
+    if (counter==1){
+      canControl.Send(MTBA_ReqCommRLeft(1), TXBANY);
+    }else if (counter==2){
+      canControl.Send(MTBA_ReqCommRLeft(2), TXBANY);
+    }else if (counter ==3){
+      canControl.Send(MTBA_ReqCommRLeft(4), TXBANY);
+    }else if (counter ==4){
+      canControl.Send(MTBA_ReqCommRRight(1), TXBANY);
+    }else if (counter ==5){
+      canControl.Send(MTBA_ReqCommRRight(2), TXBANY);
+    }else{
+      canControl.Send(MTBA_ReqCommRRight(4), TXBANY);
+    }
+    if (counter ==6){
+      counter =1;
+    }else{
+      counter++;
+    }
+      
     mtbaRequestTimer.reset();
   }
 }
