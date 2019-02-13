@@ -11,23 +11,25 @@
 //9). Get legit screen protector ($$$$$$$$)
 #include <SPI.h>
 #include <RA8875.h>
-#include "Arduino.h"
+#include <Arduino.h>
 #include "sc7SW_UI.h"
+//RA8875 tft = RA8875(0, 0);
 
-sc7SW_UI::sc7SW_UI(int _RA8875_INT, int _RA8875_CS, int _RA8875_RESET)
+sc7SW_UI::sc7SW_UI(int RA8875_INT, int RA8875_CS, int RA8875_RESET)
 {
-  tft = RA8875(_RA8875_CS, _RA8875_RESET);
-  RA8875_INT = _RA8875_INT
+  tft = RA8875(RA8875_CS, RA8875_RESET);
   
   Serial.begin(9600);
   tft.begin(RA8875_800x480);
-  tft.touchBegin(RA8875_INT);
+  //tft.touchBegin(RA8875_INT);
+
+  delay(3000); // Allows LCD to fully Boot
 
   // Sets us background interface
   setupInterface();
 }
 
-void setupInterface() {
+void sc7SW_UI::setupInterface(void) {
   
  //Screen Background
  tft.setBackgroundColor(RA8875_BLACK);
@@ -55,7 +57,7 @@ void setupInterface() {
 }
 
 //Error Message
-void updateError(String error)
+void sc7SW_UI::updateError(String error)
 {
  tft.setCursor(407,20);
  tft.setFontScale(1);
@@ -65,9 +67,9 @@ void updateError(String error)
 }
 
 //Speed  
-void updateSpeed(int _speed) 
+void sc7SW_UI::updateSpeed(int _speed) 
 {
- tft.changeMode(TEXT);
+ //tft.changeMode(TEXT);
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25,25);
  tft.setFontScale(1);
@@ -80,9 +82,9 @@ void updateSpeed(int _speed)
  tft.print("mph");
 }
  
-void updateArrCurr(int _arrCurr)
+void sc7SW_UI::updateArrCurr(int _arrCurr)
 {
- tft.changeMode(TEXT);
+ //tft.changeMode(TEXT);
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25,225);
  tft.setFontScale(2);
@@ -92,7 +94,7 @@ void updateArrCurr(int _arrCurr)
 }
  
 //Minimum Battery Voltage
-void updateMinBat(int _minBat)
+void sc7SW_UI::updateMinBat(int _minBat)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25,285);
@@ -103,18 +105,18 @@ void updateMinBat(int _minBat)
 } 
  
 //Battery Current
-void updateBatCurr(int _batCurr)
+void sc7SW_UI::updateBatCurr(int _batCurr)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25,345);
  tft.setFontScale(2);
  tft.print("Batt A: "); 
  tft.setCursor (275,345);
- tft.print(_batCur);
+ tft.print(_batCurr);
 }
  
 //Maximum temperature of BATTERY
-void updateMaxTemp(int _maxTemp)
+void sc7SW_UI::updateMaxTemp(int _maxTemp)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25,405);

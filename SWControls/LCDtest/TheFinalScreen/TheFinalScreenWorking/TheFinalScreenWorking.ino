@@ -1,11 +1,14 @@
+#include <RA8875.h>
 #include <CAN_IO.h>
 #include <Metro.h>
+
 #include <SPI.h>
 #include <RA8875.h>
-#include "src\sc7SW_UI.h"
+#include "Interface.h"
 
 #define RA8875_INT 4
 #define RA8875_CS 10
+
 #define RA8875_RESET 9
 
 
@@ -51,17 +54,17 @@ char old;          //old is the previous switch states
 #define GENERIC_TRIP_STR            String("SOMETHING IS WRONG WITH YOUR CAR")
 
 //set up pins that connect to switch terminals
-//const int fgp =   6  //forward gear --> don't have these rn for sc7
+//const int fgp =   6;  //forward gear --> don't have these rn for sc7
 //const int rgp =   7;  //reverse gear
-#define hdp A4  //headlights
-#define hzp A5  //hazardlights
-#define brkp A6 //brakes
-#define strbp A7  //strobe light
-#define hrnp A8 //horn
-#define ltp A9  //left turn
-#define rtp A10  //right turn
-#define caninterruptp 14 // CAN interrupt
-#define canchipp 52 // CAN chip select
+const int hdp =    A4;  //headlights
+const int hzp =   A5;  //hazardlights
+const int brkp = A6; //brakes
+const int strbp =   A7;  //strobe light
+const int hrnp = A8; //horn
+const int ltp =   A9;  //left turn
+const int rtp =   A10;  //right turn
+const int caninterruptp  = 14; // CAN interrupt
+const int canchipp = 52; // CAN chip select
 
 
 // miso, mosi, and sck as well
@@ -107,38 +110,40 @@ boolean BRAKES;           // Indicate if brakes are deployed
 String Err;               // Error message
 boolean TRIPPED;
 
+//Declaring Functions
+void interface();         // Implements LCD Display 
+void setup();             // Update  
+void loop ();             // 
 
+
+RA8875 tft = RA8875(RA8875_CS, RA8875_RESET);
 uint16_t tx, ty;
-
-#define MTBA_FRAME0_REAR_LEFT_ID 0 // place holder
 
 void setup() {
   // put your setup code here, to run once:
   
-  pinMode(hdp, INPUT_PULLUP); // headlights
-  pinMode(hzp, INPUT_PULLUP); // hazardlights
-  pinMode(brkp, INPUT_PULLUP); // brakes
-  pinMode(strbp, INPUT_PULLUP); // strobe lights
-  pinMode(hrnp, INPUT_PULLUP); // horn 
-  pinMode(ltp, INPUT_PULLUP); // left turn
-  pinMode(rtp, INPUT_PULLUP); // right turn
-  pinMode(caninterruptp, INPUT_PULLUP); // CAN interrupt
-  pinMode(canchipp, INPUT_PULLUP); // CAN chip select
+  pinMode(hdp, INPUT_PULLUP) // headlights
+  pinMode(hzp, INPUT_PULLUP) // hazardlights
+  pinMode(brkp, INPUT_PULLUP) // brakes
+  pinMode(strbp, INPUT_PULLUP) // strobe lights
+  pinMode(hrn, INPUT_PULLUP) // horn 
+  pinMode(ltp, INPUT_PULLUP) // left turn
+  pinMode(rtp, INPUT_PULLUP) // right turn
+  pinMode(caninterruptp, INPUT_PULLUP) // CAN interrupt
+  pinMode(canchipp, INPUT_PULLUP) // CAN chip select
 
   
 
   Serial.begin(9600);
-  sc7SW_UI swLCD = sc7SW_UI(RA8875_INT, RA8875_CS, RA8875_RESET);
-  /*
   tft.begin(RA8875_800x480);
   tft.touchBegin(RA8875_INT);
   delay(3000);  //Allow LCD and MCP2515 to fully boot (Not sure what actual value to use with the new LCD).
-  //interface(); */
+  interface();
 
-  //initializePins(); // Part of SWControls 
+  initializePins();
 
   CanControl.filters.setRB0(MASK_Sxxx, BMS_VOLT_CURR_ID, DC_TEMP_0_ID);
-  CanControl.filters.setRB1(MASK_Sxxx, MTBA_FRAME0_REAR_LEFT_ID, DC_INFO_ID, 0, 0); //**MC_VELOCITY_ID, **MC_PHASE_ID
+  CanControl.filters.setRB1(MASK_Sxxx, MTBA_FRAME0_REAR_LEFT_ID, DC_INFO_ID, 0); //**MC_VELOCITY_ID, **MC_PHASE_ID
   CanControl.Setup(RX0IE | RX1IE);
 
 // Insert DEBUG and LOOPBACK steps
@@ -168,13 +173,13 @@ void loop()  {
           CAN_RX.reset();
           break;
         }
-      /*case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
+      case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
         {
           MTBA_F0_RLEFT packet(f);
           VELOC = motor_rotating_speed * RPM_TO_MPH;
           CAN_RX.reset();
           break;
-        } */
+        }
       case DC_TEMP_0_ID: // Get Max Pack Temp
         {
           DC_Temp_0 packet(f); 
@@ -187,8 +192,8 @@ void loop()  {
           DC_Info packet(f); // Get Tripped state of vehicle
           TRIPPED = packet.tripped;
           if (TRIPPED) {
-            //ERROR = GENERIC_TRIP_STR;
-            //notif_timer.resOPet(); //res0pet doesn't exsist
+            ERROR = GENERIC_TRIP_STR;
+            notif_timer.resOPet();
           }
           CAN_RX.reset();
           break;
@@ -204,8 +209,8 @@ void loop()  {
         }*/
       case TEL_HEARTBEAT_ID:
         {
-          //steering_wheel.telemetrydisplay = 'T';
-          //telmetry_timer.reset();
+          steering_wheel.telemetrydisplay = 'T';
+          telmetry_timer.reset();
         }
         
     }

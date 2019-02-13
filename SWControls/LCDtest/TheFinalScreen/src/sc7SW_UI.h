@@ -20,22 +20,26 @@
 class sc7SW_UI
 {
   public:
-    sc7SW_UI(int,int,int);
+    sc7SW_UI(int RA8875_INT, int RA8875_CS, int RA8875_RESET);
+    RA8875 tft = RA8875(0,0);
     void updateError(String);
 
     // Update Speed on display
     void updateSpeed(int);
     // Update Array Current on display
-    void upateArrCurr(int);
+    void updateArrCurr(int);
     // Update Minimum Battery on display
     void updateMinBat(int);
     // Update Battery Current on display
     void updateBatCurr(int);
     // Update Max Temperature on display
     void updateMaxTemp(int);
+    
 
   private:
-    RA8875 tft;
+    int _RA8875_INT;
+    int _RA8875_CS;
+    int _RA8875_RESET;
     
     // Setup display, only called once
     void setupInterface(void);
