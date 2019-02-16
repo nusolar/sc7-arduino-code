@@ -388,17 +388,17 @@ void readCAN() {
 void checkTimers() {
   // check motor controller
   if (mcHbTimer.expired()) { // motor controller timeout
-    state.dcErrorFlags |= MC_TIMEOUT; // set flag
+    // state.dcErrorFlags |= MC_TIMEOUT; // set flag
   }
   
   // check bms
   if (bmsHbTimer.expired()) { // bms timeout
-    state.dcErrorFlags |= BMS_TIMEOUT; // set flag
+    // state.dcErrorFlags |= BMS_TIMEOUT; // set flag
   }
   
   // check steering wheel
   if (swHbTimer.expired()) { // steering wheel timeout
-    state.dcErrorFlags |= SW_TIMEOUT; // set flag
+    // state.dcErrorFlags |= SW_TIMEOUT; // set flag
   }
 
 }
