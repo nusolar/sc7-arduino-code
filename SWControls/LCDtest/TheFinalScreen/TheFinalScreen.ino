@@ -8,6 +8,8 @@
 #define RA8875_CS 10
 #define RA8875_RESET 9
 
+// CAN Constants not set in the CAN library (SW branch)
+
 
 #define DEBUG
 
@@ -110,7 +112,7 @@ boolean TRIPPED;
 
 uint16_t tx, ty;
 
-#define MTBA_FRAME0_REAR_LEFT_ID 0 // place holder
+sc7SW_UI swLCD = sc7SW_UI(RA8875_INT, RA8875_CS, RA8875_RESET); // Initializes screen
 
 void setup() {
   // put your setup code here, to run once:
@@ -128,7 +130,7 @@ void setup() {
   
 
   Serial.begin(9600);
-  sc7SW_UI swLCD = sc7SW_UI(RA8875_INT, RA8875_CS, RA8875_RESET);
+  delay(3000);
   /*
   tft.begin(RA8875_800x480);
   tft.touchBegin(RA8875_INT);
@@ -164,21 +166,22 @@ void loop()  {
         {
           BMS_VoltageCurrent packet(f); //Get the voltage and current of the battery pack
           BAT_CURRENT = packet.current / 1000.0;
-          //BVoltagedisplay = packet.voltage / 1000.0;
+          swLCD.updateBatCurr(BAT_CURRENT);
           CAN_RX.reset();
           break;
         }
-      /*case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
+      case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
         {
-          MTBA_F0_RLEFT packet(f);
-          VELOC = motor_rotating_speed * RPM_TO_MPH;
+          //MTBA_F0_RLEFT packet(f);
+          //VELOC = motor_rotating_speed * RPM_TO_MPH;
           CAN_RX.reset();
           break;
-        } */
+        } 
       case DC_TEMP_0_ID: // Get Max Pack Temp
         {
           DC_Temp_0 packet(f); 
           MAX_TEMPERATURE = packet.max_temp;
+          swLCD.updateMaxTemp(MAX_TEMPERATURE);
           CAN_RX.reset();
           break;
         }
@@ -187,21 +190,27 @@ void loop()  {
           DC_Info packet(f); // Get Tripped state of vehicle
           TRIPPED = packet.tripped;
           if (TRIPPED) {
-            //ERROR = GENERIC_TRIP_STR;
+            ERROR = GENERIC_TRIP_STR;
+            swLCD.updateError(ERROR);
             //notif_timer.resOPet(); //res0pet doesn't exsist
           }
+          else
+          {
+            swLCD.updateError("");
+          }
+          
           CAN_RX.reset();
           break;
         }
-      /*case BMS_STATUS_EXT_ID:
+      case BMS_STATUS_EXT_ID:
         {
         BMS_Status_Ext packet(f); // extract the flags
-        if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); steering_wheel.notification = BMS_OVVOLTAGE_STR;}
-        else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); steering_wheel.notification = BMS_UNVOLTAGE_STR;}
-        else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); steering_wheel.notification = BMS_12VERR_STR;}
+        //if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); steering_wheel.notification = BMS_OVVOLTAGE_STR;}
+        //else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); steering_wheel.notification = BMS_UNVOLTAGE_STR;}
+        //else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); steering_wheel.notification = BMS_12VERR_STR;}
         CAN_RX.reset();
         break;
-        }*/
+        }
       case TEL_HEARTBEAT_ID:
         {
           //steering_wheel.telemetrydisplay = 'T';

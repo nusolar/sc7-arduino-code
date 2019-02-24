@@ -11,12 +11,21 @@
 void setup() {
   Serial.begin(9600);
   Serial.print("Begin LCD");
-  //RA8875 tft = RA8875((uint8_t) RA8875_CS, (uint8_t) RA8875_RESET);
-  sc7SW_UI swLCD = sc7SW_UI((int) RA8875_INT, (int) RA8875_CS, (int) RA8875_RESET);
+  RA8875 swLCD = RA8875((uint8_t) RA8875_CS, (uint8_t) RA8875_RESET);
+  delay(3000);
 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  sc7SW_UI swLCD = sc7SW_UI((int) RA8875_INT, (int) RA8875_CS, (int) RA8875_RESET);
+  delay(3000);
+  swLCD.updateSpeed(1);
+  swLCD.updateArrCurr(1);
+  swLCD.updateMinBat(1);
+  swLCD.updateBatCurr(1);
+  swLCD.updateMaxTemp(1);
+  delay(50000);
+  
+    
 
 }
