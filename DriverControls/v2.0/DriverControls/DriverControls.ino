@@ -205,6 +205,8 @@ struct CarState {
   uint8_t tempsFahrenheit[32];
   uint8_t maxTemp;
   uint8_t avgTemp;
+  
+  bool overtemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -463,18 +465,24 @@ void updateState() {
   // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
-      state.tripFlag = DC_Status::F_DISCHARGING_OVER_TEMP;
+      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
       state.bmsStrobeOn = true; 
       Serial.print("Batteries are discharging, and the max temperature is ");
       Serial.println(state.maxTemp);
     }
+    else{
+      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+    }
   }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
-      state.tripFlag = DC_Status::F_CHARGING_OVER_TEMP;
+      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
       state.bmsStrobeOn = true;
       Serial.print("Batteries are charging, and the max temperature is ");
       Serial.println(state.maxTemp);
+    }
+    else {
+      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
     }
   }
 
@@ -664,7 +672,8 @@ void writeCAN() {
   if (tempSendTimer.check())
   {
     switch (tempSendCount) {
-      case 0: canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsCelsius),TXBANY); break; // send first 6 temps + min and average
+      case 0: 
+        canControl.Send(DC_Temp_0(state.maxTemp,state.avgTemp, state.tempsCelsius),TXBANY); break; // send first 6 temps + min and average
       case 1: canControl.Send(DC_Temp_1(state.tempsCelsius+6),TXBANY); break;                            // temps 7 - 14
       case 2: canControl.Send(DC_Temp_2(state.tempsCelsius+14),TXBANY); break;                           // temps 15 - 22
       case 3: canControl.Send(DC_Temp_3(state.tempsCelsius+22),TXBANY); break;                           // temps 23 - 26

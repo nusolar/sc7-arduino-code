@@ -161,22 +161,36 @@ void loop()  {
 #endif
     switch (f.id)
     {
-      case BMS_VOLT_CURR_ID: // Voltage/Current of battery 
-      
+      case BMS19_VCSOC_ID: // Voltage/Current of battery 
         {
-          BMS_VoltageCurrent packet(f); //Get the voltage and current of the battery pack
+          BMS19_VCSOC packet(f); //Get the voltage and current of the battery pack
           BAT_CURRENT = packet.current / 1000.0;
           swLCD.updateBatCurr(BAT_CURRENT);
           CAN_RX.reset();
           break;
         }
+      case BMS19_MinMaxTemp_ID:
+        {
+          BMS19_MinMaxTemp packet(f);
+          MAX_TEMPERATURE = packet.maxTemp;
+          swLCD.updateMaxTemp(MAX_TEMPERATURE);
+          CAN_RX.reset();
+          break;
+        }
       case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
         {
-          //MTBA_F0_RLEFT packet(f);
-          //VELOC = motor_rotating_speed * RPM_TO_MPH;
+          MTBA_F0_RLeft packet(f);
+          VELOC = packet.motor_rotating_speed * RPM_TO_MPH;
           CAN_RX.reset();
           break;
         } 
+      /* case BMS19_BATT_STAT_ID: 
+        {
+          BMS19_Batt_Stat packet(f);
+          VELOC = packet.motor_rotating_speed * RPM_TO_MPH;
+          CAN_RX.reset();
+          break;
+        } */
       case DC_TEMP_0_ID: // Get Max Pack Temp
         {
           DC_Temp_0 packet(f); 
@@ -190,8 +204,8 @@ void loop()  {
           DC_Info packet(f); // Get Tripped state of vehicle
           TRIPPED = packet.tripped;
           if (TRIPPED) {
-            ERROR = GENERIC_TRIP_STR;
-            swLCD.updateError(ERROR);
+            String errorStr = GENERIC_TRIP_STR;
+            swLCD.updateError(errorStr);
             //notif_timer.resOPet(); //res0pet doesn't exsist
           }
           else
