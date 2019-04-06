@@ -38,13 +38,21 @@ const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sxxx;
 const uint16_t RXF0      = 0; // Match any steering_wheel packet (because mask is Sx00)
-const uint16_t RXF1      = BMS_VOLT_CURR_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
+const uint16_t RXF1      = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
 
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF2      = SW_DATA_ID;
+/*
+* These constants do not exist within new system
 const uint16_t RXF3      = BMS_STATUS_EXT_ID;
 const uint16_t RXF4      = MC_VELOCITY_ID;
 const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
+
+* Setting these values to 0 for now
+*/
+const uint16_t RXF3      = 0; 
+const uint16_t RXF4      = 0; 
+const uint16_t RXF5      = 0; 
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
@@ -309,12 +317,22 @@ void readCAN() {
     safetyCount++;                // Increment safety counter
     Frame& f = canControl.Read(); // read one message
     
-    // determine source and update heartbeat timers
+    // determine source and update heartbeat 
+    /* 
+    * Updated for BMS19- since there are less CAN Addresses uses OR instead of base
     if ((f.id & MASK_Sx00) == BMS_BASEADDRESS) { // source is bms
       bmsHbTimer.reset();
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
-    else if ((f.id & MASK_Sx00) == MC_BASEADDRESS) { // source is mc
+    */
+    if ((f.id == BMS19_VCSOC_ID) || 
+        (f.id == BMS19_MinMaxTemp_ID) || 
+        (f.id == BMS19_BATT_STAT_ID)) {
+          bmsHbTimer.reset();
+          state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
+        }
+
+    else if (f.id & MTBA_BASEADDRESS) { // source is mc, checks if bit at address
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
     }
@@ -324,6 +342,9 @@ void readCAN() {
       state.SW_timer_reset_by = f.id;
     }
     
+    /*
+    * Needs to be updated for Mitsuba Motor (Now different left and right motors)
+    * Requires motor current and motor velocity
     // check for specific packets
     if (f.id == MC_BUS_STATUS_ID) { // motor controller bus status
       MC_BusStatus packet(f);
@@ -333,7 +354,10 @@ void readCAN() {
       MC_Velocity packet(f);
       state.motorVelocity = packet.motor_velocity;
       state.carVelocity = packet.car_velocity * M_PER_SEC_TO_MPH;
-    }
+    } */
+
+    /*
+    * Updated for 2019 BMS, BMS Status package does not exist
     else if (f.id == BMS_SOC_ID) { // bms state of charge
       BMS_SOC packet(f);
       state.bmsPercentSOC = packet.percent_SOC;
@@ -341,6 +365,10 @@ void readCAN() {
     else if (f.id == BMS_STATUS_EXT_ID) { //bms status
       BMS_Status_Ext packet(f);
       state.bmsErrorFlags = packet.flags;
+    } */
+    else if (f.id = BMS19_VCSOC_ID) {
+      BMS19_VCSOC packet(f);
+      state.bmsPercentSOC = packet.packSOC;
     }
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
@@ -357,11 +385,12 @@ void readCAN() {
       //state.cruiseCtrlPrev = state.cruiseCtrl;
       //state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
     }
+    /*
     else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
       BMS_VoltageCurrent packet(f);
       state.bmsCurrent = packet.current;
       state.updateCurrentBufferRequested = true;
-    }
+    } */
     else if (DEBUG) {
       Serial.print("Unk. Packet: "); Serial.println(frameToString(f));
     }
@@ -487,6 +516,8 @@ void updateState() {
   }
 
   // bms strobe light trip conditions
+  /*
+  * Being Updated to let BMS decide where strobe light is toggled
   if(state.bmsErrorFlags & BMS_Status_Ext::F_OVERVOLTAGE){
     state.tripFlag = TRIP_FROM_BMS;
     state.bmsStrobeOn = true;
@@ -498,8 +529,9 @@ void updateState() {
   if(state.bmsErrorFlags & BMS_Status_Ext::F_DRVCTRLSLOST){
     state.tripFlag = TRIP_FROM_BMS;
     state.bmsStrobeOn = true;
-  }
-  
+  } 
+  */
+
   // update cruise control state
   //if (!state.cruiseCtrlPrev && state.cruiseCtrl) { // cruise control just switched on
   //  state.cruiseCtrlOn = true;
