@@ -42,17 +42,9 @@ const uint16_t RXF1      = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it wil
 
 const uint16_t RXM1      = MASK_Sxxx;
 const uint16_t RXF2      = SW_DATA_ID;
-/*
-* These constants do not exist within new system
-const uint16_t RXF3      = BMS_STATUS_EXT_ID;
-const uint16_t RXF4      = MC_VELOCITY_ID;
-const uint16_t RXF5      = MC_BUS_STATUS_ID; //Also kinda useless right now since we read BMS current.
-
-* Setting these values to 0 for now
-*/
-const uint16_t RXF3      = 0; 
-const uint16_t RXF4      = 0; 
-const uint16_t RXF5      = 0; 
+const uint16_t RXF3      = 0; // No longer relevant, but keeping here to have a value
+const uint16_t RXF4      = (MTBA_FRAME0_REAR_LEFT_ID & MASK_Sxxx); // Not sure if necessary, but MTBA IDs are 29 bits
+const uint16_t RXF5      = (MTBA_FRAME0_REAR_RIGHT_ID & MASK_Sxxx); 
 
 // timer intervals (all in ms)
 const uint16_t MC_HB_INTERVAL    = 1000;  // motor controller heartbeat
@@ -86,9 +78,10 @@ const int      MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CA
 const bool     ENABLE_REGEN        = false;   // flag to enable/disable regen
 const uint16_t DC_ID               = 0x00C7;  // For SC7
 const uint16_t DC_SER_NO           = 0x0042;  // Don't panic!
-const uint8_t    NUM_TEMP_MODULES    = 26;    // Number of temperature sensors
-const uint8_t    CHARGE_TEMP         = 45;    // battery temp threshold when current is positive
-const uint8_t    DISCHARGE_TEMP      = 60;    // battery temp threshold when current is negative
+const uint8_t  NUM_TEMP_MODULES  = 26;    // Number of temperature sensors
+const uint8_t  CHARGE_TEMP       = 45;    // battery temp threshold when current is positive
+const uint8_t  DISCHARGE_TEMP    = 60;    // battery temp threshold when current is negative
+const float    RPM_TO_MPH          = 2.2369f ;//Change for correct values, diameter 19 inch
 
 // steering wheel parameters
 const byte NEUTRAL_RAW = 0x03;
@@ -153,8 +146,8 @@ struct CarState {
   //bool cruiseCtrl;    // true if driver wants cruise control on
   
   // motor info
-  float motorVelocity;  // rotational speed of motor (rpm)
-  float carVelocity;    // velocity of car (mph)
+  float motorVelocity[2];  // rotational speed of motor (rpm): 0 is left, 1 is right
+  float carVelocity[2];
   int16_t busCurrent;
   
   // bms info
@@ -325,23 +318,38 @@ void readCAN() {
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
     */
-    if ((f.id == BMS19_VCSOC_ID) || 
-        (f.id == BMS19_MinMaxTemp_ID) || 
-        (f.id == BMS19_BATT_STAT_ID)) {
-          bmsHbTimer.reset();
-          state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
-        }
 
-    else if (f.id & MTBA_BASEADDRESS) { // source is mc, checks if bit at address
-      mcHbTimer.reset();
-      state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
+    // Needs to check if BMS packet
+    if (f.id = BMS19_VCSOC_ID) {
+      BMS19_VCSOC packet(f);
+      bmsHbTimer.reset(); // Updates here as well since there is only BMS packet we can read
+      state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
+      state.bmsPercentSOC = packet.packSOC;
+      state.bmsCurrent = packet.current;
     }
     else if ((f.id & MASK_Sx00) == SW_BASEADDRESS) { // source is sw
       swHbTimer.reset();
       state.dcErrorFlags &= ~SW_TIMEOUT; // clear flag
       state.SW_timer_reset_by = f.id;
     }
-    
+
+    // There are two main masks,
+    if (f.id == MTBA_FRAME0_REAR_LEFT_ID) { // source is mc, checks if bit at address
+      MTBA_F0_RLeft packet(f);
+      mcHbTimer.reset();
+      state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
+      state.motorVelocity[0] = packet.motor_rotating_speed;
+      state.carVelocity[0] = packet.motor_rotating_speed * RPM_TO_MPH;
+      //state.carVelocity[0] = packet.car_velocity * M_PER_SEC_TO_MPH; NO LONGER EXISTS
+    }
+    else if (f.id == MTBA_FRAME0_REAR_RIGHT_ID) { // source is mc, checks if bit at address
+      MTBA_F0_RRight packet(f);
+      mcHbTimer.reset();
+      state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
+      state.motorVelocity[1] = packet.motor_rotating_speed;
+      state.carVelocity[1] = packet.motor_rotating_speed * RPM_TO_MPH;
+      //state.carVelocity[0] = packet.car_velocity * M_PER_SEC_TO_MPH; NO LONGER EXISTS
+    }
     /*
     * Needs to be updated for Mitsuba Motor (Now different left and right motors)
     * Requires motor current and motor velocity
@@ -366,10 +374,6 @@ void readCAN() {
       BMS_Status_Ext packet(f);
       state.bmsErrorFlags = packet.flags;
     } */
-    else if (f.id = BMS19_VCSOC_ID) {
-      BMS19_VCSOC packet(f);
-      state.bmsPercentSOC = packet.packSOC;
-    }
     else if (f.id == SW_DATA_ID) { // steering wheel data
       SW_Data packet(f);
       
@@ -446,13 +450,15 @@ void updateState() {
       state.gear = NEUTRAL; // can always change to neutral
       break;
     case FORWARD_RAW:
-      if (state.carVelocity > -GEAR_CHANGE_CUTOFF) { // going forward or velocity less than cutoff, gear switch ok
-        state.gear = FORWARD;
+      if ((state.carVelocity[0] > -GEAR_CHANGE_CUTOFF) && 
+          (state.carVelocity[1] > -GEAR_CHANGE_CUTOFF)) { // going forward or velocity less than cutoff, gear switch ok
+            state.gear = FORWARD;
       }
       break;
     case REVERSE_RAW:
-      if (state.carVelocity < GEAR_CHANGE_CUTOFF) { // going backward or velocity less than cutoff, gear switch ok
-        state.gear = REVERSE;
+      if ((state.carVelocity[0] < GEAR_CHANGE_CUTOFF) &&
+          (state.carVelocity[1] < GEAR_CHANGE_CUTOFF)) { // going backward or velocity less than cutoff, gear switch ok
+            state.gear = REVERSE;
       }
       break;
     default: // unknown gear
@@ -494,24 +500,24 @@ void updateState() {
   // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
-      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
       state.bmsStrobeOn = true; 
       Serial.print("Batteries are discharging, and the max temperature is ");
       Serial.println(state.maxTemp);
     }
     else{
-      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
     }
   }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
-      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
       state.bmsStrobeOn = true;
       Serial.print("Batteries are charging, and the max temperature is ");
       Serial.println(state.maxTemp);
     }
     else {
-      canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
     }
   }
 
@@ -931,7 +937,13 @@ void setup() {
   //Enabling One-Shot mode (debugging)
   //canControl.controller.Write(CANCTRL, 00001111);
   //Serial.println((canControl.controller.Read(CANCTRL)), BIN);
- 
+
+  // Toggles BMS Precharge Signal after initialization
+  // WARNING: DOES NOT CHECK FOR OVERHEAT AT THIS POINT
+  canControl.Send(BMS19_Overheat_Precharge(false, true), TXBANY);
+  delay(5000);
+  canControl.Send(BMS19_Overheat_Precharge(false, false), TXBANY);
+; 
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
   if (DEBUG && canControl.errors != 0) {
@@ -1146,4 +1158,3 @@ void loop() {
   // Reset canErrorFlags after each loop.
   state.canErrorFlags = 0;
 }
-
