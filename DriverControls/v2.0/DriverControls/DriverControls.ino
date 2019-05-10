@@ -2,7 +2,7 @@
  * DriverControls.ino
  * Contains code to run the driver controls
  * board for sc7.
- */
+ */ 
 
 #include <CAN_IO.h>
 #include <stdint.h>
@@ -33,7 +33,7 @@ const byte BOARDLED       = 13;
 const byte BMS_STROBE_PIN = 48;
 
 // CAN parameters
-const uint16_t BAUD_RATE = 1000;
+const uint16_t BAUD_RATE = 250;
 const byte     FREQ      = 16;
 
 const uint16_t RXM0      = MASK_Sxxx;
@@ -204,7 +204,7 @@ struct CarState {
   //temperature
   uint8_t tempsCelsius[32];
   uint8_t tempsFahrenheit[32];
-  uint8_t maxTemp;
+  uint8_t maxTemp = 0; // FOR DEBUGGING
   uint8_t avgTemp;
   
   bool overtemp;
@@ -309,7 +309,8 @@ void readCAN() {
   while(canControl.Available() && safetyCount <= MAX_CAN_PACKETS_PER_LOOP) { // there are messages
     safetyCount++;                // Increment safety counter
     Frame& f = canControl.Read(); // read one message
-    
+    Serial.println("\n\nGetting CAN Packet");
+
     // determine source and update heartbeat 
     /* 
     * Updated for BMS19- since there are less CAN Addresses uses OR instead of base
@@ -500,25 +501,23 @@ void updateState() {
   // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
   if(state.bmsCurrent < 0.0){   // negative current, discharge
     if(state.maxTemp >= DISCHARGE_TEMP){
-      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      state.overtemp = true;
+      canControl.Send(BMS19_Overheat_Precharge(true, false),TXBANY); // TEST EDIT
       state.bmsStrobeOn = true; 
-      Serial.print("Batteries are discharging, and the max temperature is ");
-      Serial.println(state.maxTemp);
     }
     else{
-      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
-    }
+      state.overtemp = false;
+    } 
   }      
   else{ // positive current, charge
     if(state.maxTemp >= CHARGE_TEMP){
-      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
+      state.overtemp = true;
+      canControl.Send(BMS19_Overheat_Precharge(true, false),TXBANY);
       state.bmsStrobeOn = true;
-      Serial.print("Batteries are charging, and the max temperature is ");
-      Serial.println(state.maxTemp);
     }
     else {
-      //canControl.Send(DC_Temp_Overheat(state.overtemp),TXBANY);
-    }
+        state.overtemp = false;
+    } 
   }
 
   // bms strobe light trip conditions
@@ -667,7 +666,7 @@ void writeCAN() {
     
     // create and send motor control packet
     bool trysend = canControl.Send(DC_Drive(MCvelocity, MCcurrent), TXBANY);
-   
+    
     // reset timer
     if (trysend) 
       dcDriveTimer.reset();
