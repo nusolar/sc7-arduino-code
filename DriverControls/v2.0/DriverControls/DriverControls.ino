@@ -325,6 +325,10 @@ void readCAN() {
       BMS19_VCSOC packet(f);
       bmsHbTimer.reset(); // Updates here as well since there is only BMS packet we can read
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
+      Serial.println("SOC Packet");
+      Serial.print(f.s0); Serial.print(f.s1);
+      Serial.print(f.s2); Serial.print(f.s3);
+      Serial.println(f.s4);
       state.bmsPercentSOC = packet.packSOC;
       state.bmsCurrent = packet.current;
     }
@@ -1098,6 +1102,8 @@ void loop() {
         Serial.println(state.hazards ? "YES" : "NO");
         Serial.print("BMS Strobe: ");
         Serial.println(state.bmsStrobeOn ? "YES" : "NO");
+        Serial.print("BMS SOC: ");
+        Serial.println(state.bmsPercentSOC);
         break;
       case 2: 
         //Serial.print("Cruise control: ");

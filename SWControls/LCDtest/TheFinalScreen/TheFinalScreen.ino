@@ -2,7 +2,6 @@
 #include <Metro.h>
 #include <SPI.h>
 #include <RA8875.h>
-#include "src\sc7SW_UI.h"
 
 #define RA8875_INT 4
 #define RA8875_CS 10
@@ -85,10 +84,10 @@ Metro debug_timer = Metro(200);
 Metro telmetry_timer = Metro(2500);
 
 //CAN parameters --> check these, may be diff
-const byte CAN_CS = 10;
-const byte CAN_INT = 2; // Interrupt #1
-const uint16_t CAN_BAUD_RATE = 500;
-const byte CAN_FREQ = 16;
+const byte     CAN_CS    = 52; //2 CAN computer system
+const byte     CAN_INT   = 14; //10 CAN Interrupt 
+const uint16_t CAN_BAUD_RATE = 250; // CAN Baud Rate
+const byte     CAN_FREQ      = 16; //CAN Frequency 
 uint16_t errors;
 
 CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); //Try initializing without interrupts for now
@@ -99,6 +98,7 @@ float BAT_CURRENT; // Battery Current (from CAN)
 float MIN_BAT;
 float ARRAY_CURRENT;   // Array Current (from CAN)
 float MAX_TEMPERATURE; // Max Pack Temperature (from CAN)
+float avgTemp;
 
 String HAZARD_LIGHT; // Hazard Lights
 boolean LEFT_LIGHT;  // Left Turn Signal
@@ -106,10 +106,9 @@ boolean RIGHT_LIGHT; // Right Turn Signal
 boolean BRAKES;      // Indicate if brakes are deployed
 String Err;          // Error message
 boolean TRIPPED;
-
 uint16_t tx, ty;
 
-sc7SW_UI swLCD = sc7SW_UI(RA8875_INT, RA8875_CS, RA8875_RESET); // Initializes screen
+RA8875 tft(RA8875_CS, RA8875_RESET);
 
 void setup()
 {
@@ -125,15 +124,15 @@ void setup()
   pinMode(caninterruptp, INPUT_PULLUP); // CAN interrupt
   pinMode(canchipp, INPUT_PULLUP);      // CAN chip select
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   delay(3000);
-  /*
-  tft.begin(RA8875_800x480);
-  tft.touchBegin(RA8875_INT);
+  
+  tft.begin(RA8875_480x272);
+  //tft.touchBegin(RA8875_INT);
   delay(3000);  //Allow LCD and MCP2515 to fully boot (Not sure what actual value to use with the new LCD).
-  //interface(); */
+  setupInterface();
 
-  //initializePins(); // Part of SWControls
+ // initializePins(); // Part of SWControls
   const uint16_t RXM0 = MASK_Sxxx;
   const uint16_t RXF0 = 0;              // Match any steering_wheel packet (because mask is Sx00)
   const uint16_t RXF1 = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
@@ -170,18 +169,18 @@ void loop()
     {
       BMS19_VCSOC packet(f); //Get the voltage and current of the battery pack
       BAT_CURRENT = packet.current / 1000.0;
-      swLCD.updateBatCurr(BAT_CURRENT);
+      updateBatCurr(BAT_CURRENT);
       CAN_RX.reset();
       break;
     }
-    case BMS19_MinMaxTemp_ID:
+    /*case BMS19_MinMaxTemp_ID:
     {
       BMS19_MinMaxTemp packet(f);
       MAX_TEMPERATURE = packet.maxTemp;
-      swLCD.updateMaxTemp(MAX_TEMPERATURE);
+      updateMaxTemp(MAX_TEMPERATURE);
       CAN_RX.reset();
       break;
-    }
+    } */
     case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
     {
       MTBA_F0_RLeft packet(f);
@@ -200,7 +199,9 @@ void loop()
     {
       DC_Temp_0 packet(f);
       MAX_TEMPERATURE = packet.max_temp;
-      swLCD.updateMaxTemp(MAX_TEMPERATURE);
+      avgTemp = packet.avg_temp;
+      updateMaxTemp(MAX_TEMPERATURE);
+      updateAvgTemp(avgTemp);
       CAN_RX.reset();
       break;
     }
@@ -211,12 +212,12 @@ void loop()
       if (TRIPPED)
       {
         String errorStr = GENERIC_TRIP_STR;
-        swLCD.updateError(errorStr);
+        updateError(errorStr);
         //notif_timer.resOPet(); //res0pet doesn't exsist
       }
       else
       {
-        swLCD.updateError("");
+        updateError("");
       }
 
       CAN_RX.reset();
@@ -238,4 +239,106 @@ void loop()
     } */
     }
   }
+}
+
+void setupInterface() {
+  
+ //Screen Background
+ tft.setBackgroundColor(RA8875_BLACK);
+ tft.drawRect(5,5,390/2, 195/2, RA8875_WHITE);
+ tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE);
+ tft.drawRect(400/2,5, 390/2, 470/2,RA8875_WHITE);
+ 
+ //Basic Car Model
+ tft.drawRect(600/2,170/2,150/2,240/2,RA8875_WHITE);
+ tft.drawEllipse(675/2,320/2,15/2,30/2,RA8875_WHITE);
+ tft.drawRect(600/2,230/2,20/2,45/2,RA8875_WHITE);
+ tft.drawRect(730/2,230/2,20/2,45/2,RA8875_WHITE);
+ tft.drawRect(600/2,365/2,20/2,45/2,RA8875_WHITE);
+ tft.drawRect(730/2,365/2,20/2,45/2,RA8875_WHITE);
+ 
+ //Headlights
+ tft.fillTriangle(605/2,150/2,645/2,150/2,625/2,190/2,RA8875_YELLOW);
+ tft.fillTriangle(745/2,150/2,705/2,150/2,725/2,190/2,RA8875_YELLOW);
+ 
+ //Turn Signals
+ tft.fillTriangle(590/2,440/2,620/2,425/2,620/2,455/2, RA8875_YELLOW);
+ tft.fillTriangle(760/2,440/2,730/2,425/2,730/2,455/2, RA8875_YELLOW);
+ tft.fillRect(620/2,433/2,30/2,14/2,RA8875_YELLOW);
+ tft.fillRect(700/2,433/2,30/2,14/2,RA8875_YELLOW);
+}
+
+void updateError(String error)
+{
+ tft.setCursor(407/2,20/2);
+ tft.setFontScale(1);
+ tft.setTextColor(RA8875_WHITE,RA8875_BLACK);
+ tft.print("Error: ");
+ tft.print(error);
+}
+
+void updateSpeed(int _speed) 
+{
+ //tft.changeMode(TEXT);
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,25/2);
+ tft.setFontScale(1);
+ tft.print("Speed: ");
+ tft.setCursor(180/2,70/2);
+ tft.setFontScale(5);
+ tft.print(_speed);
+ tft.setCursor(330/2,150/2);
+ tft.setFontScale(1);
+ tft.print("mph");
+}
+
+void updateArrCurr(int _arrCurr)
+{
+ //tft.changeMode(TEXT);
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,225/2);
+ tft.setFontScale(2);
+ tft.print("Array(A): ");
+ tft.setCursor (275/2,225/2);
+ tft.print(_arrCurr);
+}
+
+void updateMinBat(int _minBat)
+{
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,285/2);
+ tft.setFontScale(2);
+ tft.print("Min V: ");
+ tft.setCursor (275/2,285/2);
+ tft.print(_minBat);
+} 
+
+void updateBatCurr(int _batCurr)
+{
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,345/2);
+ tft.setFontScale(2);
+ tft.print("Batt A: "); 
+ tft.setCursor (275/2,345/2);
+ tft.print(_batCurr);
+}
+
+void updateMaxTemp(int _maxTemp)
+{
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,405/2);
+ tft.setFontScale(2);
+ tft.print("Max Temp: ");
+ tft.setCursor (275/2,405/2);
+ tft.print(_maxTemp);
+}
+
+void updateAvgTemp(int _avgTemp)
+{
+ tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
+ tft.setCursor (25/2,465/2);
+ tft.setFontScale(2);
+ tft.print("Avg Temp: ");
+ tft.setCursor (275/2,465/2);
+ tft.print(_avgTemp);
 }
