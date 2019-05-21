@@ -84,8 +84,8 @@ Metro debug_timer = Metro(200);
 Metro telmetry_timer = Metro(2500);
 
 //CAN parameters --> check these, may be diff
-const byte     CAN_CS    = 52; //2 CAN computer system
-const byte     CAN_INT   = 14; //10 CAN Interrupt 
+const byte     CAN_CS    = 52;//52; //2 CAN computer system
+const byte     CAN_INT   = 14;//14; //10 CAN Interrupt 
 const uint16_t CAN_BAUD_RATE = 250; // CAN Baud Rate
 const byte     CAN_FREQ      = 16; //CAN Frequency 
 uint16_t errors;
@@ -133,20 +133,43 @@ void setup()
   setupInterface();
 
  // initializePins(); // Part of SWControls
-  const uint16_t RXM0 = MASK_Sxxx;
-  const uint16_t RXF0 = 0;              // Match any steering_wheel packet (because mask is Sx00)
-  const uint16_t RXF1 = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
+ const uint16_t RXM0      = MASK_Sxxx;
+ const uint16_t RXF0      = 0; // Match any steering_wheel packet (because mask is Sx00)
+ const uint16_t RXF1      = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
 
-  const uint16_t RXM1 = MASK_Sxxx;
-  const uint16_t RXF2 = SW_DATA_ID;
-  const uint16_t RXF3 = 0;                                      // No longer relevant, but keeping here to have a value
-  const uint16_t RXF4 = (MTBA_FRAME0_REAR_LEFT_ID & MASK_Sxxx); // Not sure if necessary, but MTBA IDs are 29 bits
-  const uint16_t RXF5 = (MTBA_FRAME0_REAR_RIGHT_ID & MASK_Sxxx);
+ const uint16_t RXM1      = MASK_Sxxx;
+ const uint16_t RXF2      = SW_DATA_ID;
+ const uint16_t RXF3      = 0; // No longer relevant, but keeping here to have a value
+ const uint16_t RXF4      = (MTBA_FRAME0_REAR_LEFT_ID & MASK_Sxxx); // Not sure if necessary, but MTBA IDs are 29 bits
+ const uint16_t RXF5      = (MTBA_FRAME0_REAR_RIGHT_ID & MASK_Sxxx); 
   CanControl.filters.setRB0(MASK_Sxxx, RXF0, RXF1);
   CanControl.filters.setRB1(MASK_Sxxx, RXF2, RXF3, RXF4, RXF5); //**MC_VELOCITY_ID, **MC_PHASE_ID
-  CanControl.Setup(RX0IE | RX1IE | TX1IE | TX2IE | TX0IE);
+  CanControl.Setup(RX0IE | RX1IE | TX0IE | TX1IE | TX2IE);
 
   // Insert DEBUG and LOOPBACK steps
+  if (CanControl.errors != 0) {
+    Serial.print("Init CAN error: ");
+    Serial.println(CanControl.errors, HEX);
+
+    byte Txstatus[3] = {0,0,0};
+    Txstatus[0] = CanControl.controller.Read(TXB0CTRL);
+    Txstatus[1] = CanControl.controller.Read(TXB1CTRL);
+    Txstatus[2] = CanControl.controller.Read(TXB2CTRL);
+    byte canintf = 0; canintf = CanControl.last_interrupt;
+    byte canctrl = 0; canctrl = CanControl.controller.Read(CANCTRL);
+    
+    Serial.println("TXnCTRL: ");
+    Serial.println(Txstatus[0], BIN);
+    Serial.println(Txstatus[1], BIN);
+    Serial.println(Txstatus[2], BIN);
+    Serial.print("Last Interrupt: ");
+    Serial.println(canintf, BIN);
+    Serial.print("CANCTRL: ");
+    Serial.println(canctrl, BIN);
+    Serial.print("CANSTAT: ");
+    Serial.println(CanControl.canstat_register, BIN);
+    Serial.println("");
+  }
 }
 
 void loop()

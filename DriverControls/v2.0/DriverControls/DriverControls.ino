@@ -510,6 +510,7 @@ void updateState() {
       state.bmsStrobeOn = true; 
     }
     else{
+      canControl.Send(BMS19_Overheat_Precharge(false, false),TXBANY); // TEST EDIT
       state.overtemp = false;
     } 
   }      
@@ -520,6 +521,7 @@ void updateState() {
       state.bmsStrobeOn = true;
     }
     else {
+        canControl.Send(BMS19_Overheat_Precharge(false, false),TXBANY); // TEST EDIT
         state.overtemp = false;
     } 
   }
