@@ -15,14 +15,15 @@ const byte CAN_FREQ = 16;
 
 CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); //Try initializing without interrupts for now
 
-void setup() {
+void setup()
+{
   //pinMode(caninterruptp, INPUT_PULLUP); // CAN interrupt
   //pinMode(canchipp, INPUT_PULLUP);      // CAN chip select
 
   Serial.begin(115200);
   delay(3000);
   Serial.println(true << 10, BIN);
-  
+
   //initializePins(); // Part of SWControls
   const uint16_t RXM0 = MASK_Sxxx;
   const uint16_t RXF0 = 0;              // Match any steering_wheel packet (because mask is Sx00)
@@ -37,9 +38,38 @@ void setup() {
   CanControl.filters.setRB0(MASK_Sxxx, RXF0, RXF1);
   CanControl.filters.setRB1(MASK_Sxxx, RXF2, RXF3, RXF4, RXF5); //**MC_VELOCITY_ID, **MC_PHASE_ID
   CanControl.Setup(RX0IE | RX1IE | TX1IE | TX2IE | TX0IE);
+
+// Insert DEBUG and LOOPBACK steps
+  if (CanControl.errors != 0)
+  {
+    Serial.print("Init CAN error: ");
+    Serial.println(CanControl.errors, HEX);
+
+    byte Txstatus[3] = {0, 0, 0};
+    Txstatus[0] = CanControl.controller.Read(TXB0CTRL);
+    Txstatus[1] = CanControl.controller.Read(TXB1CTRL);
+    Txstatus[2] = CanControl.controller.Read(TXB2CTRL);
+    byte canintf = 0;
+    canintf = CanControl.last_interrupt;
+    byte canctrl = 0;
+    canctrl = CanControl.controller.Read(CANCTRL);
+
+    Serial.println("TXnCTRL: ");
+    Serial.println(Txstatus[0], BIN);
+    Serial.println(Txstatus[1], BIN);
+    Serial.println(Txstatus[2], BIN);
+    Serial.print("Last Interrupt: ");
+    Serial.println(canintf, BIN);
+    Serial.print("CANCTRL: ");
+    Serial.println(canctrl, BIN);
+    Serial.print("CANSTAT: ");
+    Serial.println(CanControl.canstat_register, BIN);
+    Serial.println("");
+  }
 }
 
-void loop() {
+void loop()
+{
   // Fetch any potential messages from the MCP2515
   CanControl.Fetch();
 
@@ -50,13 +80,13 @@ void loop() {
     Frame &f = CanControl.Read();
     Serial.print("Received: ");
     Serial.print(f.id, HEX);
-    Serial.println((int) f.value, BIN);
+    Serial.println((int)f.value, BIN);
 
     if (f.id == BMS19_OVERHEAT_PRECHARGE_ID)
     {
       BMS19_Overheat_Precharge packet(f);
-      Serial.print("Overheat packet: "); 
-      Serial.println(packet.overTempLimit); 
+      Serial.print("Overheat packet: ");
+      Serial.println(packet.overTempLimit);
     }
   }
 }

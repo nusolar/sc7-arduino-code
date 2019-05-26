@@ -61,6 +61,7 @@ const uint16_t DEBUG_INTERVAL    = 333;   // interval for debug calls output
 const uint16_t TEMP_CONV_INTERVAL = 800;   // interval for temp sense conversion
 const uint16_t TEMP_READ_INTERVAL = 100;   // interval for temp sense reading
 const uint16_t TEMP_SEND_INTERVAL = 500;   // interval for temp sense sending (over can)
+const uint16_t TEMP_OVERHEAT_INTERVAL = 1000;   // interval for overheat temp sense sending (over can)
 
 // drive parameters
 const uint16_t MAX_ACCEL_VOLTAGE   = 1024;    // max possible accel voltage
@@ -207,7 +208,7 @@ struct CarState {
   uint8_t maxTemp = 0; // FOR DEBUGGING
   uint8_t avgTemp;
   
-  bool overtemp;
+  bool validTemp;
 };
 
 //----------------------------DATA/VARIABLES---------------------------//
@@ -233,6 +234,7 @@ Metro dcPowerTimer(DC_POWER_INTERVAL);
 Metro tempConvertTimer(TEMP_CONV_INTERVAL);   // timer for issuing convert command to temp sensors
 Metro tempReadTimer(TEMP_READ_INTERVAL);      // timer for reading the values from temp sensorss
 Metro tempSendTimer(TEMP_SEND_INTERVAL);      // timer for reading the values from temp sensorss
+Metro tempOverheatTimer(TEMP_OVERHEAT_INTERVAL); // timer for indication of overheat from temp sensors
 
 // debugging variables
 long loopStartTime = 0;
@@ -319,16 +321,14 @@ void readCAN() {
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
     }
     */
-
+    
     // Needs to check if BMS packet
-    if (f.id = BMS19_VCSOC_ID) {
+    if (f.id == BMS19_VCSOC_ID) {
       BMS19_VCSOC packet(f);
       bmsHbTimer.reset(); // Updates here as well since there is only BMS packet we can read
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
-      Serial.println("SOC Packet");
-      Serial.print(f.s0); Serial.print(f.s1);
-      Serial.print(f.s2); Serial.print(f.s3);
-      Serial.println(f.s4);
+      Serial.print("SOC Packet");
+      Serial.println(f.toString());      
       state.bmsPercentSOC = packet.packSOC;
       state.bmsCurrent = packet.current;
     }
@@ -339,7 +339,7 @@ void readCAN() {
     }
 
     // There are two main masks,
-    if (f.id == MTBA_FRAME0_REAR_LEFT_ID) { // source is mc, checks if bit at address
+    else if (f.id == MTBA_FRAME0_REAR_LEFT_ID) { // source is mc, checks if bit at address
       MTBA_F0_RLeft packet(f);
       mcHbTimer.reset();
       state.dcErrorFlags &= ~MC_TIMEOUT; // clear flag
@@ -394,12 +394,6 @@ void readCAN() {
       //state.cruiseCtrlPrev = state.cruiseCtrl;
       //state.cruiseCtrl = (packet.cruisectrl == SW_ON_BIT);
     }
-    /*
-    else if (f.id == BMS_VOLT_CURR_ID) { // BMS Voltage Current Packet
-      BMS_VoltageCurrent packet(f);
-      state.bmsCurrent = packet.current;
-      state.updateCurrentBufferRequested = true;
-    } */
     else if (DEBUG) {
       Serial.print("Unk. Packet: "); Serial.println(frameToString(f));
     }
@@ -503,28 +497,15 @@ void updateState() {
   }
 
   // Trip if temp sensors are overtemp, temperature threshold depending on whether discharge or charge
-  if(state.bmsCurrent < 0.0){   // negative current, discharge
-    if(state.maxTemp >= DISCHARGE_TEMP){
-      state.overtemp = true;
-      canControl.Send(BMS19_Overheat_Precharge(true, false),TXBANY); // TEST EDIT
-      state.bmsStrobeOn = true; 
+  if((state.bmsCurrent < 0.0 && state.maxTemp >= DISCHARGE_TEMP) || 
+      state.maxTemp >= CHARGE_TEMP) { // Uses short circuiting
+        // negative current, discharge
+        state.validTemp = false;
+        state.bmsStrobeOn = true; 
     }
-    else{
-      canControl.Send(BMS19_Overheat_Precharge(false, false),TXBANY); // TEST EDIT
-      state.overtemp = false;
-    } 
-  }      
-  else{ // positive current, charge
-    if(state.maxTemp >= CHARGE_TEMP){
-      state.overtemp = true;
-      canControl.Send(BMS19_Overheat_Precharge(true, false),TXBANY);
-      state.bmsStrobeOn = true;
-    }
-    else {
-        canControl.Send(BMS19_Overheat_Precharge(false, false),TXBANY); // TEST EDIT
-        state.overtemp = false;
-    } 
-  }
+  else{
+      state.validTemp = true;
+    }       
 
   // bms strobe light trip conditions
   /*
@@ -724,6 +705,11 @@ void writeCAN() {
 
     tempSendCount = (tempSendCount + 1) % 4;
     // Don't reset yet because then the temperature sensor code will never see the timer expired.
+  }
+
+  if (tempOverheatTimer.check())
+  {
+      canControl.Send(BMS19_Overheat_Precharge(state.validTemp,false),TXBANY);
   }
 }
 
@@ -945,9 +931,11 @@ void setup() {
 
   // Toggles BMS Precharge Signal after initialization
   // WARNING: DOES NOT CHECK FOR OVERHEAT AT THIS POINT
-  canControl.Send(BMS19_Overheat_Precharge(false, true), TXBANY);
-  delay(5000);
+  Serial.print("Waiting for precharge...");
   canControl.Send(BMS19_Overheat_Precharge(false, false), TXBANY);
+  delay(5000);
+  Serial.println(" Ready");
+  canControl.Send(BMS19_Overheat_Precharge(false, true), TXBANY);
 ; 
   digitalWrite(BOARDLED,LOW);   // Turn of led after initialization
   
