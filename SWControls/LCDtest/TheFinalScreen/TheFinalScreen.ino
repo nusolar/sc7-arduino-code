@@ -2,12 +2,11 @@
 #include <Metro.h>
 #include <SPI.h>
 #include <RA8875.h>
+#include "src/sc7Dashboard_UI.h"
 
 #define RA8875_INT 4
 #define RA8875_CS 10
 #define RA8875_RESET 9
-
-// CAN Constants not set in the CAN library (SW branch)
 
 #define DEBUG
 
@@ -60,8 +59,6 @@ char old;          //old is the previous switch states
 #define hrnp A8          //horn
 #define ltp A9           //left turn
 #define rtp A10          //right turn
-#define caninterruptp 14 // CAN interrupt
-#define canchipp 52      // CAN chip select
 
 // miso, mosi, and sck as well
 
@@ -108,7 +105,8 @@ String Err;          // Error message
 boolean TRIPPED;
 uint16_t tx, ty;
 
-RA8875 tft(RA8875_CS, RA8875_RESET);
+RA8875 lcd(RA8875_CS, RA8875_RESET);
+sc7Dashboard_UI tft(lcd);
 
 void setup()
 {
@@ -127,10 +125,7 @@ void setup()
   Serial.begin(115200);
   delay(3000);
   
-  tft.begin(RA8875_480x272);
-  //tft.touchBegin(RA8875_INT);
-  delay(3000);  //Allow LCD and MCP2515 to fully boot (Not sure what actual value to use with the new LCD).
-  setupInterface();
+  tft.begin();
 
  // initializePins(); // Part of SWControls
  const uint16_t RXM0      = MASK_Sxxx;
@@ -195,7 +190,7 @@ void loop()
     {
       BMS19_VCSOC packet(f); //Get the voltage and current of the battery pack
       BAT_CURRENT = packet.current / 1000.0;
-      updateBatCurr(BAT_CURRENT);
+      tft.updateBatCurr(BAT_CURRENT);
       CAN_RX.reset();
       break;
     }
@@ -226,8 +221,8 @@ void loop()
       DC_Temp_0 packet(f);
       MAX_TEMPERATURE = packet.max_temp;
       avgTemp = packet.avg_temp;
-      updateMaxTemp(MAX_TEMPERATURE);
-      updateAvgTemp(avgTemp);
+      tft.updateMaxTemp(MAX_TEMPERATURE);
+      tft.updateAvgTemp(avgTemp);
       CAN_RX.reset();
       break;
     }
@@ -238,12 +233,12 @@ void loop()
       if (TRIPPED)
       {
         String errorStr = GENERIC_TRIP_STR;
-        updateError(errorStr);
+        tft.updateError(errorStr);
         //notif_timer.resOPet(); //res0pet doesn't exsist
       }
       else
       {
-        updateError("");
+        tft.updateError("");
       }
 
       CAN_RX.reset();
@@ -265,106 +260,4 @@ void loop()
     } */
     }
   }
-}
-
-void setupInterface() {
-  
- //Screen Background
- tft.setBackgroundColor(RA8875_BLACK);
- tft.drawRect(5,5,390/2, 195/2, RA8875_WHITE);
- tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE);
- tft.drawRect(400/2,5, 390/2, 470/2,RA8875_WHITE);
- 
- //Basic Car Model
- tft.drawRect(600/2,170/2,150/2,240/2,RA8875_WHITE);
- tft.drawEllipse(675/2,320/2,15/2,30/2,RA8875_WHITE);
- tft.drawRect(600/2,230/2,20/2,45/2,RA8875_WHITE);
- tft.drawRect(730/2,230/2,20/2,45/2,RA8875_WHITE);
- tft.drawRect(600/2,365/2,20/2,45/2,RA8875_WHITE);
- tft.drawRect(730/2,365/2,20/2,45/2,RA8875_WHITE);
- 
- //Headlights
- tft.fillTriangle(605/2,150/2,645/2,150/2,625/2,190/2,RA8875_YELLOW);
- tft.fillTriangle(745/2,150/2,705/2,150/2,725/2,190/2,RA8875_YELLOW);
- 
- //Turn Signals
- tft.fillTriangle(590/2,440/2,620/2,425/2,620/2,455/2, RA8875_YELLOW);
- tft.fillTriangle(760/2,440/2,730/2,425/2,730/2,455/2, RA8875_YELLOW);
- tft.fillRect(620/2,433/2,30/2,14/2,RA8875_YELLOW);
- tft.fillRect(700/2,433/2,30/2,14/2,RA8875_YELLOW);
-}
-
-void updateError(String error)
-{
- tft.setCursor(407/2,20/2);
- tft.setFontScale(1);
- tft.setTextColor(RA8875_WHITE,RA8875_BLACK);
- tft.print("Error: ");
- tft.print(error);
-}
-
-void updateSpeed(int _speed) 
-{
- //tft.changeMode(TEXT);
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,25/2);
- tft.setFontScale(1);
- tft.print("Speed: ");
- tft.setCursor(180/2,70/2);
- tft.setFontScale(5);
- tft.print(_speed);
- tft.setCursor(330/2,150/2);
- tft.setFontScale(1);
- tft.print("mph");
-}
-
-void updateArrCurr(int _arrCurr)
-{
- //tft.changeMode(TEXT);
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,225/2);
- tft.setFontScale(2);
- tft.print("Array(A): ");
- tft.setCursor (275/2,225/2);
- tft.print(_arrCurr);
-}
-
-void updateMinBat(int _minBat)
-{
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,285/2);
- tft.setFontScale(2);
- tft.print("Min V: ");
- tft.setCursor (275/2,285/2);
- tft.print(_minBat);
-} 
-
-void updateBatCurr(int _batCurr)
-{
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,345/2);
- tft.setFontScale(2);
- tft.print("Batt A: "); 
- tft.setCursor (275/2,345/2);
- tft.print(_batCurr);
-}
-
-void updateMaxTemp(int _maxTemp)
-{
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,405/2);
- tft.setFontScale(2);
- tft.print("Max Temp: ");
- tft.setCursor (275/2,405/2);
- tft.print(_maxTemp);
-}
-
-void updateAvgTemp(int _avgTemp)
-{
- tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,465/2);
- tft.setFontScale(2);
- tft.print("Avg Temp: ");
- tft.setCursor (275/2,465/2);
- tft.print(_avgTemp);
 }
