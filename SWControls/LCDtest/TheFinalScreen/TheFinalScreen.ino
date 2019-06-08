@@ -79,11 +79,13 @@ Metro blinking_timer = Metro(500);
 Metro debug_timer = Metro(200);
 //8th: Telemetry HB timer
 Metro telmetry_timer = Metro(2500);
+//9th: Display update timer
+Metro disp_timer = Metro(333);
 
 //CAN parameters --> check these, may be diff
 const byte     CAN_CS    = 52; // CAN computer system
 const byte     CAN_INT   = 14; //10 CAN Interrupt 
-const uint16_t CAN_BAUD_RATE = 250; // CAN Baud Rate
+const uint16_t CAN_BAUD_RATE = 125; // CAN Baud Rate
 const byte     CAN_FREQ      = 16; //CAN Frequency 
 uint16_t errors;
 
@@ -107,10 +109,12 @@ uint16_t tx, ty;
 
 RA8875 lcd(RA8875_CS, RA8875_RESET);
 sc7Dashboard_UI tft(lcd);
+displayData dispData = {};
 
 void setup()
 {
   // put your setup code here, to run once:
+  /*
 
   pinMode(hdp, INPUT_PULLUP);           // headlights
   pinMode(hzp, INPUT_PULLUP);           // hazardlights
@@ -122,24 +126,26 @@ void setup()
   //pinMode(caninterruptp, INPUT_PULLUP); // CAN interrupt
   //pinMode(canchipp, INPUT_PULLUP);      // CAN chip select
 
+  */ 
   Serial.begin(115200);
   delay(3000);
   
   tft.begin();
 
- // initializePins(); // Part of SWControls
- const uint16_t RXM0      = MASK_Sxxx;
- const uint16_t RXF0      = 0; // Match any steering_wheel packet (because mask is Sx00)
- const uint16_t RXF1      = BMS19_VCSOC_ID; // Can't put 0 here, otherwise it will match all packets that start with 0.
+ // Extended IDs
+ const uint32_t RXM0      = MASK_EID;
+ const uint32_t RXF0      = MTBA_FRAME0_REAR_LEFT_ID; 
+ const uint32_t RXF1      = MTBA_FRAME0_REAR_RIGHT_ID; 
 
+// Standard IDs
  const uint16_t RXM1      = MASK_Sxxx;
- const uint16_t RXF2      = SW_DATA_ID;
- const uint16_t RXF3      = 0; // No longer relevant, but keeping here to have a value
- const uint16_t RXF4      = (MTBA_FRAME0_REAR_LEFT_ID & MASK_Sxxx); // Not sure if necessary, but MTBA IDs are 29 bits
- const uint16_t RXF5      = (MTBA_FRAME0_REAR_RIGHT_ID & MASK_Sxxx); 
+ const uint16_t RXF2      = BMS19_VCSOC_ID;
+ const uint16_t RXF3      = (MPPT_ANS_BASEADDRESS | MPPT_LEFT_OFFSET); 
+ const uint16_t RXF4      = (MPPT_ANS_BASEADDRESS | MPPT_RIGHT_OFFSET); 
+ const uint16_t RXF5      = 0; 
 
-  CanControl.filters.setRB0(MASK_Sxxx, RXF0, RXF1);
-  CanControl.filters.setRB1(MASK_Sxxx, RXF2, RXF3, RXF4, RXF5); //**MC_VELOCITY_ID, **MC_PHASE_ID
+  CanControl.filters.setRB0(RXM0, RXF0, RXF1);
+  CanControl.filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5); 
   CanControl.Setup(RX0IE | RX1IE | TX1IE | TX2IE | TX0IE);
 
   // Insert DEBUG and LOOPBACK steps
@@ -172,6 +178,10 @@ void setup()
 
 void loop()
 {
+  if (disp_timer.check()) {
+    tft.update(dispData);
+    Serial.println("Refresh");
+  }
   // Fetch any potential messages from the MCP2515
   CanControl.Fetch();
 
@@ -189,40 +199,22 @@ void loop()
     case BMS19_VCSOC_ID: // Voltage/Current of battery
     {
       BMS19_VCSOC packet(f); //Get the voltage and current of the battery pack
-      BAT_CURRENT = packet.current / 1000.0;
-      tft.updateBatCurr(BAT_CURRENT);
+      dispData.BatCurr = packet.current / 1000.0;
       CAN_RX.reset();
       break;
     }
-    /*case BMS19_MinMaxTemp_ID:
-    {
-      BMS19_MinMaxTemp packet(f);
-      MAX_TEMPERATURE = packet.maxTemp;
-      updateMaxTemp(MAX_TEMPERATURE);
-      CAN_RX.reset();
-      break;
-    } */
     case MTBA_FRAME0_REAR_LEFT_ID: //Velocity: 19 inch diameter of wheels, figure out conversion factor
     {
       MTBA_F0_RLeft packet(f);
-      VELOC = packet.motor_rotating_speed * RPM_TO_MPH;
+      dispData.speed = packet.motor_rotating_speed * RPM_TO_MPH;
       CAN_RX.reset();
       break;
     }
-    /* case BMS19_BATT_STAT_ID: 
-        {
-          BMS19_Batt_Stat packet(f);
-          VELOC = packet.motor_rotating_speed * RPM_TO_MPH;
-          CAN_RX.reset();
-          break;
-        } */
     case DC_TEMP_0_ID: // Get Max Pack Temp
     {
       DC_Temp_0 packet(f);
-      MAX_TEMPERATURE = packet.max_temp;
-      avgTemp = packet.avg_temp;
-      tft.updateMaxTemp(MAX_TEMPERATURE);
-      tft.updateAvgTemp(avgTemp);
+      dispData.maxTemp = packet.max_temp;
+      dispData.avgTemp = packet.avg_temp;
       CAN_RX.reset();
       break;
     }
@@ -233,31 +225,13 @@ void loop()
       if (TRIPPED)
       {
         String errorStr = GENERIC_TRIP_STR;
-        tft.updateError(errorStr);
+        dispData.err = errorStr;
         //notif_timer.resOPet(); //res0pet doesn't exsist
-      }
-      else
-      {
-        tft.updateError("");
       }
 
       CAN_RX.reset();
       break;
     }
-    /*case BMS_STATUS_EXT_ID:
-    {
-      BMS_Status_Ext packet(f); // extract the flags
-      //if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); steering_wheel.notification = BMS_OVVOLTAGE_STR;}
-      //else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); steering_wheel.notification = BMS_UNVOLTAGE_STR;}
-      //else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); steering_wheel.notification = BMS_12VERR_STR;}
-      CAN_RX.reset();
-      break;
-    }
-    case TEL_HEARTBEAT_ID:
-    {
-      //steering_wheel.telemetrydisplay = 'T';
-      //telmetry_timer.reset();
-    } */
     }
   }
 }

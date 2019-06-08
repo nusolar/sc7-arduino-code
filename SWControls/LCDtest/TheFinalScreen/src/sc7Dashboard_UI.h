@@ -5,6 +5,18 @@
 #include <RA8875.h>
 #include "Arduino.h"
 
+typedef struct
+    {
+        float speed = 0;
+        float arrCurr = 0;
+        float minBat = 0;
+        float BatCurr = 0;
+        float maxTemp = 0;
+        float avgTemp = 0;
+        String err = "";
+
+    } displayData;
+
 class sc7Dashboard_UI
 {
 public:
@@ -15,7 +27,11 @@ public:
 
     // Setup display, only called once
     void begin(void);
+    void update(const displayData &dispData);
 
+private:
+    RA8875 tft;
+    
     // Update Speed on display
     void updateSpeed(int);
     // Update Array Current on display
@@ -29,7 +45,7 @@ public:
     // Updated Average Temperature on display
     void updateAvgTemp(int);
 
-private:
-    RA8875 tft;
+    int screenHeight = 272;
+    int screenWidth = 480;
 };
 #endif

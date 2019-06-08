@@ -222,28 +222,6 @@ void loop() {
           CAN_RX.reset();
           break;
       }
-      
-      /*case DC_INFO_ID:
-      {
-          DC_Info packet(f); // Get Tripped state of vehicle
-          TRIPPED = packet.tripped;
-          if (TRIPPED) {
-            Err = GENERIC_TRIP_STR;
-            notif_timer.reset();
-          }
-          Err = "";
-          //CAN_RX.reset();
-          break;
-      }*/
-      /*case BMS_STATUS_EXT_ID:
-      {
-          BMS_Status_Ext packet(f); // extract the flags
-          if      (packet.flags & BMS_Status_Ext::F_OVERVOLTAGE)    {notif_timer.reset(); Err = BMS_OVVOLTAGE_STR;}
-          else if (packet.flags & BMS_Status_Ext::F_UNDERVOLTAGE)   {notif_timer.reset(); Err = BMS_UNVOLTAGE_STR;}
-          else if (packet.flags & BMS_Status_Ext::F_12VLOW)         {notif_timer.reset(); Err = BMS_12VERR_STR;}
-          //CAN_RX.reset();
-          break;
-      }*/
     }
   }
 #ifdef DEBUG

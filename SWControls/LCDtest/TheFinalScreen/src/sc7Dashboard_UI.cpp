@@ -9,10 +9,15 @@ void sc7Dashboard_UI::begin(void) {
 
  //Screen Background
  tft.setBackgroundColor(RA8875_BLACK);
- tft.drawRect(5,5,390/2, 195/2, RA8875_WHITE);
- tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE);
- tft.drawRect(400/2,5, 390/2, 470/2,RA8875_WHITE);
- 
+ tft.drawRect(0,0, screenWidth/2, screenHeight/3, RA8875_WHITE); // Upper Left Corner
+ tft.drawRect(0, screenHeight/3, screenWidth/2, screenHeight * 2/3, RA8875_WHITE); // Lower Left Corner
+ tft.drawRect(screenWidth/2, 0, screenWidth/2, screenHeight, RA8875_WHITE);
+/* 
+ tft.drawRect(5,5,390/2, 195/2, RA8875_WHITE); // Upper Left Corner
+ tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE); // Lower Left Corner
+ tft.drawRect(400/2,5, 390/2, 470/2,RA8875_WHITE); // Right side
+ */
+
  //Basic Car Model
  tft.drawRect(600/2,170/2,150/2,240/2,RA8875_WHITE);
  tft.drawEllipse(675/2,320/2,15/2,30/2,RA8875_WHITE);
@@ -36,7 +41,7 @@ void sc7Dashboard_UI::begin(void) {
 void sc7Dashboard_UI::updateError(String error)
 {
  tft.setCursor(407/2,20/2);
- tft.setFontScale(1);
+ tft.setFontScale(0);
  tft.setTextColor(RA8875_WHITE,RA8875_BLACK);
  tft.print("Error: ");
  tft.print(error);
@@ -48,13 +53,13 @@ void sc7Dashboard_UI::updateSpeed(int _speed)
  //tft.changeMode(TEXT);
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,25/2);
- tft.setFontScale(1);
+ tft.setFontScale(0);
  tft.print("Speed: ");
  tft.setCursor(180/2,70/2);
  tft.setFontScale(5);
  tft.print(_speed);
  tft.setCursor(330/2,150/2);
- tft.setFontScale(1);
+ tft.setFontScale(0);
  tft.print("mph");
 }
 
@@ -63,7 +68,7 @@ void sc7Dashboard_UI::updateArrCurr(int _arrCurr)
  //tft.changeMode(TEXT);
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,225/2);
- tft.setFontScale(2);
+ tft.setFontScale(0);
  tft.print("Array(A): ");
  tft.setCursor (275/2,225/2);
  tft.print(_arrCurr);
@@ -74,7 +79,7 @@ void sc7Dashboard_UI::updateMinBat(int _minBat)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,285/2);
- tft.setFontScale(2);
+ tft.setFontScale(0);
  tft.print("Min V: ");
  tft.setCursor (275/2,285/2);
  tft.print(_minBat);
@@ -85,7 +90,7 @@ void sc7Dashboard_UI::updateBatCurr(int _batCurr)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,345/2);
- tft.setFontScale(2);
+ tft.setFontScale(0);
  tft.print("Batt A: "); 
  tft.setCursor (275/2,345/2);
  tft.print(_batCurr);
@@ -95,8 +100,8 @@ void sc7Dashboard_UI::updateBatCurr(int _batCurr)
 void sc7Dashboard_UI::updateMaxTemp(int _maxTemp)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
- tft.setCursor (25/2,465/2);
- tft.setFontScale(2);
+ tft.setCursor (25/2,405/2);
+ tft.setFontScale(0);
  tft.print("Avg Temp: ");
  tft.setCursor (275/2,465/2);
  tft.print(_maxTemp);
@@ -106,8 +111,25 @@ void sc7Dashboard_UI::updateAvgTemp(int _avgTemp)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,465/2);
- tft.setFontScale(2);
+ tft.setFontScale(0);
  tft.print("Avg Temp: ");
  tft.setCursor (275/2,465/2);
  tft.print(_avgTemp);
+}
+
+void sc7Dashboard_UI::update(const displayData& dispData)
+{
+    //Clears Screen of text
+    //Screen Background
+    tft.fillRect(5,205/2,390/2, 270/2, RA8875_BLACK);
+    tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE);
+    
+    //updates text
+    updateError(dispData.err);
+    updateSpeed(dispData.speed);
+    updateArrCurr(dispData.arrCurr);
+    updateMinBat(dispData.minBat);
+    updateBatCurr(dispData.BatCurr);
+    updateMaxTemp(dispData.maxTemp);
+    updateAvgTemp(dispData.avgTemp);
 }
