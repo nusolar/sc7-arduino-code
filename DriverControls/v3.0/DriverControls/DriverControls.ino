@@ -33,7 +33,8 @@ const byte LEFT_TURN_PIN  = 12;
 const byte HEADLIGHT_PIN  = 10;
 const byte BRAKELIGHT_PIN = 13; */
 const byte BOARDLED = 13;
-const byte BMS_STROBE_PIN = 11;
+const byte BMS_STROBE_PIN = A2;
+const byte IGNITION_PIN = 30;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 125;
@@ -205,13 +206,13 @@ struct CarState
   // outputs
   //bool rightTurnOn;   // true if we should turn rt signal on
   //bool leftTurnOn;    // true if we should turn lt signal on
-  bool bmsStrobeOn; // true if we should turn on the bms strobe (for tripping)
+  bool bmsIgnition; // true if we should turn on the bms strobe (for tripping)
   bool bmsStrobeToggle;
 
   // errors
   uint16_t canErrorFlags; // keep track of errors with CAN bus
   uint16_t dcErrorFlags;  // keep track of other errors
-  uint32_t bmsErrorFlags; // keep track of error flags from BMS (for bms led strobe)
+  uint32_t bmsErrorFlags; // keep track of error flags from BMS (forif bms led strobe)
 
   //temperature
   uint8_t tempsCelsius[32];
@@ -233,10 +234,10 @@ CAN_IO canControl(CS_PIN, INTERRUPT_PIN, BAUD_RATE, FREQ);
 // car state
 CarState state;
 
+// timers
 Metro bmsHbTimer(BMS_HB_INTERVAL); // bms heartbeat
 Metro mcHbTimer(MC_HB_INTERVAL);   // motor controller heartbeat
 Metro mcReqTimer(MC_REQ_INTERVAL);
-// timers
 /* 
 Metro dcDriveTimer(DC_DRIVE_INTERVAL);            // motor controller send packet
 Metro dcInfoTimer(DC_INFO_INTERVAL);              // Info packet to BMS and Steering Wheel
@@ -366,6 +367,7 @@ void readCAN()
       BMS19_Trip_Stat packet(f);
       bmsHbTimer.reset();
       state.dcErrorFlags &= ~BMS_TIMEOUT; // clear flag
+      // For the following, default packet output is 0
       state.dischargeEnable = packet.dischargeRelay;
       state.chargeEnable = packet.chargeRelay;
       state.MPOEnable = packet.MPO;
@@ -486,7 +488,7 @@ void updateState()
 
   if (strobeTimer.check())
   {
-    if (state.bmsStrobeOn)
+    if (~state.bmsIgnition)
     {
       state.bmsStrobeToggle = !state.bmsStrobeToggle;
     }
@@ -532,7 +534,7 @@ void updateState()
   { // Uses short circuiting
     // negative current, discharge
     state.validTemp = false;
-    state.bmsStrobeOn = true;
+    state.bmsIgnition = true;
   }
   else
   {
@@ -540,9 +542,13 @@ void updateState()
   }
 
   // BMS 19 Strobe light, if any conditions are false- trip strobe
-  if (!(state.chargeEnable & state.dischargeEnable & state.MPOEnable))
+  if (state.chargeEnable && state.dischargeEnable && state.MPOEnable)
   {
-    state.bmsStrobeOn = true;
+    state.bmsIgnition = true;
+  }
+  else
+  {
+    state.bmsIgnition = false;
   }
 
   // bms strobe light trip conditions
@@ -550,15 +556,15 @@ void updateState()
   * Being Updated to let BMS decide where strobe light is toggled
   if(state.bmsErrorFlags & BMS_Status_Ext::F_OVERVOLTAGE){
     state.tripFlag = TRIP_FROM_BMS;
-    state.bmsStrobeOn = true;
+    state.bmsIgnition = true;
   }
   if(state.bmsErrorFlags & BMS_Status_Ext::F_UNDERVOLTAGE){
     state.tripFlag = TRIP_FROM_BMS;
-    state.bmsStrobeOn = true;
+    state.bmsIgnition = true;
   }
   if(state.bmsErrorFlags & BMS_Status_Ext::F_DRVCTRLSLOST){
     state.tripFlag = TRIP_FROM_BMS;
-    state.bmsStrobeOn = true;
+    state.bmsIgnition = true;
   } 
   */
 
@@ -603,7 +609,7 @@ void updateState()
     // charging current check
     if (state.bmsCurrent > 0.0 && state.bmsCurrent >= CHARGE_CURRENT_THRESH){
       state.tripFlag = DC_Status::F_CHARGING_OVER_CURRENT;
-      state.bmsStrobeOn = true;
+      state.bmsIgnition = true;
     }
     // This code compares the incoming value with the value in the array that it replaces. If one is overcurrent
     // and the other is undercurrent, it increments/decrements the counter accordingly.
@@ -625,7 +631,7 @@ void updateState()
     if (absBMSCurrent >= MAX_CURRENT_THRESH ||
         state.numOvercurrents > OVERCURRENTS_ALLOWED) { // kill car
       state.tripFlag = DC_Status::F_DISCHARGING_OVER_CURRENT;
-      state.bmsStrobeOn = true;
+      state.bmsIgnition = true;
     }
 
     //Finally mark this update request handled
@@ -659,6 +665,8 @@ void writeOutputs()
   //digitalWrite(RIGHT_TURN_PIN, state.rightTurnOn ? HIGH : LOW);
   //digitalWrite(LEFT_TURN_PIN, state.leftTurnOn ? HIGH : LOW);
   digitalWrite(BMS_STROBE_PIN, state.bmsStrobeToggle ? HIGH : LOW);
+  // If Strobe light in on, cut ignition
+  digitalWrite(IGNITION_PIN, state.bmsIgnition ? HIGH : LOW);
 }
 
 /*
@@ -981,7 +989,7 @@ void setup()
     state.currentBuffer[i] = 0;
   } */
   //state.tripFlag = false;
-  state.bmsStrobeOn = false;
+  state.bmsIgnition = false;
 
   // set the watchdog timer interval
   WDT_Enable(WDT, 0x2000 | WDT_INTERVAL | (WDT_INTERVAL << 16));
@@ -1151,9 +1159,11 @@ void loop()
       //Serial.println(state.tripFlag,HEX);
       break;
     case 1:
-      /*
         Serial.print("Ignition: ");
-        Serial.println(state.ignition,HEX);
+        Serial.println(state.bmsIgnition,HEX);
+        Serial.print("Strobe Toggle: ");
+        Serial.println(state.bmsStrobeToggle, HEX);
+        /*
         Serial.print("IgnitionRaw: ");
         Serial.println(state.ignitionRaw,HEX);
         Serial.print("Ignition digitalRead: ");
@@ -1175,7 +1185,7 @@ void loop()
       //Serial.print("Hazards: ");
       //Serial.println(state.hazards ? "YES" : "NO");
       Serial.print("BMS Strobe: ");
-      Serial.println(state.bmsStrobeOn ? "YES" : "NO");
+      Serial.println(state.bmsIgnition ? "YES" : "NO");
       Serial.print("BMS SOC: ");
       Serial.println(state.bmsPercentSOC);
       break;
