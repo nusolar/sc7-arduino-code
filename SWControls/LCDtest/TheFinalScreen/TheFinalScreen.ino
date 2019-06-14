@@ -10,31 +10,9 @@
 
 #define DEBUG
 
-/*Defining the bitwise functions (bitwise operators)
-  We're using bits to store data because there are only 8 bytes available for use in a CAN packet.
-  We can store all of the necessary data in a single byte and save space. This frees up space to
-  send other data that we might need in the future between the steering wheel and the driver controls*/
-#define BIT(n) (1 << (n))
-#define BIT_SET(y, mask) (y |= (mask))                               //Set the value of BIT = 1
-#define BIT_CLEAR(y, mask) (y &= ~(mask))                            //Set the value of BIT = 0
-#define BIT_FLIP(y, mask) (y ^= (mask))                              //Flip the value of BIT
-#define BIT_DIFFERENT(y, x, mask) (y & mask == x & mask)             //See if two bits are different values
-#define BIT_CHECK(y, bit, mask) (BIT_DIFFERENT(y, (bit)*mask, mask)) //check function utilizing the previous defined different function
-
-//Defining the bit masks
-#define FWD_GEAR BIT(0) // might be diff with the new motors
-#define REV_GEAR BIT(1) // might be diff with the new motors
-#define HEADLIGHT BIT(2)
-#define HAZARDLIGHT BIT(3)
-//#define LAP_TIMER BIT(4)
-#define HORN BIT(5)
-#define LEFT_TURN BIT(6)
-#define RIGHT_TURN BIT(7)
-
-/*These are the bytes containing the above-mentioned bits. The two bytes will be used
-  to compare the switch states and determine whether there has been a change or not.*/
-char young = 0xFF; //young is continuously assigned to the new switch states 255
-char old;          //old is the previous switch states
+#define BMS_CURR_VALUE 0.1f
+#define BMS_VOLT_VALUE 0.1f
+#define BMS_SOC_VALUE 0.5f
 
 //Conversion data for displayed measurements
 #define RPM_TO_MPH 2.2369f //Change for correct values, diameter 19 inch
@@ -91,22 +69,6 @@ uint16_t errors;
 
 CAN_IO CanControl(CAN_CS, CAN_INT, CAN_BAUD_RATE, CAN_FREQ); 
 
-//Indicators:
-float VELOC;       // Velocity (from CAN)
-float BAT_CURRENT; // Battery Current (from CAN)
-float MIN_BAT;
-float ARRAY_CURRENT;   // Array Current (from CAN)
-float MAX_TEMPERATURE; // Max Pack Temperature (from CAN)
-float avgTemp;
-
-String HAZARD_LIGHT; // Hazard Lights
-boolean LEFT_LIGHT;  // Left Turn Signal
-boolean RIGHT_LIGHT; // Right Turn Signal
-boolean BRAKES;      // Indicate if brakes are deployed
-String Err;          // Error message
-boolean TRIPPED;
-uint16_t tx, ty;
-
 RA8875 lcd(RA8875_CS, RA8875_RESET);
 sc7Dashboard_UI tft(lcd);
 displayData dispData = {};
@@ -138,11 +100,11 @@ void setup()
  const uint32_t RXF1      = MTBA_FRAME0_REAR_RIGHT_ID; 
 
 // Standard IDs
- const uint16_t RXM1      = MASK_Sxxx;
- const uint16_t RXF2      = BMS19_VCSOC_ID;
- const uint16_t RXF3      = (MPPT_ANS_BASEADDRESS | MPPT_LEFT_OFFSET); 
- const uint16_t RXF4      = (MPPT_ANS_BASEADDRESS | MPPT_RIGHT_OFFSET); 
- const uint16_t RXF5      = 0; 
+ const uint32_t RXM1      = MASK_NONE; // Last three bits free for MPPT offset
+ const uint32_t RXF2      = BMS19_VCSOC_ID;
+ const uint32_t RXF3      = (MPPT_ANS_BASEADDRESS & MASK_Sxx0); 
+ const uint32_t RXF4      = DC_TEMP_0_ID; 
+ const uint32_t RXF5      = 0;  // Place Holder
 
   CanControl.filters.setRB0(RXM0, RXF0, RXF1);
   CanControl.filters.setRB1(RXM1, RXF2, RXF3, RXF4, RXF5); 
@@ -191,15 +153,22 @@ void loop()
     // Use available CAN packets to assign values to appropriate members of the data structures
     Frame &f = CanControl.Read();
 #ifdef DEBUG
-    Serial.print("Received: ");
-    Serial.println(f.id, HEX);
+    //Serial.print("Received: ");
+    //Serial.println(f.id, HEX);
 #endif
     switch (f.id)
     {
     case BMS19_VCSOC_ID: // Voltage/Current of battery
     {
       BMS19_VCSOC packet(f); //Get the voltage and current of the battery pack
-      dispData.BatCurr = packet.current / 1000.0;
+      Serial.println(f.toString());
+      dispData.packCurr = packet.current * BMS_CURR_VALUE;
+      dispData.packVolt = packet.voltage * BMS_VOLT_VALUE;
+      Serial.println(packet.voltage);
+      Serial.println(dispData.packVolt);
+      dispData.packSOC = packet.packSOC * BMS_SOC_VALUE;
+      Serial.println(packet.packSOC);
+      Serial.println(dispData.packSOC);
       CAN_RX.reset();
       break;
     }
@@ -215,20 +184,6 @@ void loop()
       DC_Temp_0 packet(f);
       dispData.maxTemp = packet.max_temp;
       dispData.avgTemp = packet.avg_temp;
-      CAN_RX.reset();
-      break;
-    }
-    case DC_INFO_ID:
-    {
-      DC_Info packet(f); // Get Tripped state of vehicle
-      TRIPPED = packet.tripped;
-      if (TRIPPED)
-      {
-        String errorStr = GENERIC_TRIP_STR;
-        dispData.err = errorStr;
-        //notif_timer.resOPet(); //res0pet doesn't exsist
-      }
-
       CAN_RX.reset();
       break;
     }

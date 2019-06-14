@@ -40,7 +40,7 @@ void sc7Dashboard_UI::begin(void) {
 //Error Message
 void sc7Dashboard_UI::updateError(String error)
 {
- tft.setCursor(407/2,20/2);
+ tft.setCursor(600/2,20/2);
  tft.setFontScale(0);
  tft.setTextColor(RA8875_WHITE,RA8875_BLACK);
  tft.print("Error: ");
@@ -58,42 +58,42 @@ void sc7Dashboard_UI::updateSpeed(int _speed)
  tft.setCursor(180/2,70/2);
  tft.setFontScale(5);
  tft.print(_speed);
- tft.setCursor(330/2,150/2);
+ tft.setCursor(330/2,120/2);
  tft.setFontScale(0);
  tft.print("mph");
 }
 
-void sc7Dashboard_UI::updateArrCurr(int _arrCurr)
+void sc7Dashboard_UI::updatePackCurr(int _packCurr)
 {
  //tft.changeMode(TEXT);
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,225/2);
  tft.setFontScale(0);
- tft.print("Array(A): ");
+ tft.print("Pack Curr (A): ");
  tft.setCursor (275/2,225/2);
- tft.print(_arrCurr);
+ tft.print(_packCurr);
 }
 
-//Minimum Battery Voltage
-void sc7Dashboard_UI::updateMinBat(int _minBat)
+// Batt Pack Voltage
+void sc7Dashboard_UI::updatePackVolt(int _packVolt)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,285/2);
  tft.setFontScale(0);
- tft.print("Min V: ");
+ tft.print("Pack Volt (V): ");
  tft.setCursor (275/2,285/2);
- tft.print(_minBat);
+ tft.print(_packVolt);
 } 
 
-//Battery Current
-void sc7Dashboard_UI::updateBatCurr(int _batCurr)
+// Batt Pack SOC
+void sc7Dashboard_UI::updatePackSOC(int _packSOC)
 {
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,345/2);
  tft.setFontScale(0);
- tft.print("Batt A: "); 
+ tft.print("Pack SOC (%): "); 
  tft.setCursor (275/2,345/2);
- tft.print(_batCurr);
+ tft.print(_packSOC);
 }
 
 //Maximum temperature of BATTERY
@@ -102,8 +102,8 @@ void sc7Dashboard_UI::updateMaxTemp(int _maxTemp)
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,405/2);
  tft.setFontScale(0);
- tft.print("Avg Temp: ");
- tft.setCursor (275/2,465/2);
+ tft.print("Max Temp (C): ");
+ tft.setCursor (275/2,405/2);
  tft.print(_maxTemp);
 }
 
@@ -112,7 +112,7 @@ void sc7Dashboard_UI::updateAvgTemp(int _avgTemp)
  tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
  tft.setCursor (25/2,465/2);
  tft.setFontScale(0);
- tft.print("Avg Temp: ");
+ tft.print("Avg Temp (C): ");
  tft.setCursor (275/2,465/2);
  tft.print(_avgTemp);
 }
@@ -122,14 +122,14 @@ void sc7Dashboard_UI::update(const displayData& dispData)
     //Clears Screen of text
     //Screen Background
     tft.fillRect(5,205/2,390/2, 270/2, RA8875_BLACK);
-    tft.drawRect(5,205/2,390/2, 270/2, RA8875_WHITE);
+    tft.drawRect(0, screenHeight/3, screenWidth/2, screenHeight * 2/3, RA8875_WHITE); // Lower Left Corner
     
     //updates text
     updateError(dispData.err);
     updateSpeed(dispData.speed);
-    updateArrCurr(dispData.arrCurr);
-    updateMinBat(dispData.minBat);
-    updateBatCurr(dispData.BatCurr);
+    updatePackCurr(dispData.packCurr);
+    updatePackVolt(dispData.packVolt);
+    updatePackSOC(dispData.packSOC);
     updateMaxTemp(dispData.maxTemp);
     updateAvgTemp(dispData.avgTemp);
 }

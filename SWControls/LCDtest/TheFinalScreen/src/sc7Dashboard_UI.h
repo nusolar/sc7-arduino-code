@@ -8,9 +8,9 @@
 typedef struct
     {
         float speed = 0;
-        float arrCurr = 0;
-        float minBat = 0;
-        float BatCurr = 0;
+        float packCurr = 0;
+        float packVolt = 0;
+        float packSOC = 0;
         float maxTemp = 0;
         float avgTemp = 0;
         String err = "";
@@ -35,11 +35,11 @@ private:
     // Update Speed on display
     void updateSpeed(int);
     // Update Array Current on display
-    void updateArrCurr(int);
+    void updatePackCurr(int);
     // Update Minimum Battery on display
-    void updateMinBat(int);
+    void updatePackVolt(int);
     // Update Battery Current on display
-    void updateBatCurr(int);
+    void updatePackSOC(int);
     // Update Max Temperature on display
     void updateMaxTemp(int);
     // Updated Average Temperature on display

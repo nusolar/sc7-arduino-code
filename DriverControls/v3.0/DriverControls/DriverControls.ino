@@ -778,6 +778,7 @@ void writeCAN()
   {
     canControl.Send(MPPT_Request(MPPT_LEFT_OFFSET), TXBANY);
     canControl.Send(MPPT_Request(MPPT_RIGHT_OFFSET), TXBANY);
+    canControl.Send(MPPT_Request(MPPT_SUB_OFFSET), TXBANY);
   }
 
   if (mcReqTimer.check())
