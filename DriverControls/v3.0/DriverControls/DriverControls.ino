@@ -27,6 +27,7 @@ const byte BRAKELIGHT_PIN = A6;
 const byte BOARDLED = 13;
 const byte BMS_STROBE_PIN = A2;
 const byte IGNITION_PIN = 30;
+const byte THROTTLE_PIN = A3;
 
 // CAN parameters
 const uint16_t BAUD_RATE = 125;
@@ -55,6 +56,7 @@ const uint16_t TEMP_SEND_INTERVAL = 500;      // interval for temp sense sending
 const uint16_t TEMP_OVERHEAT_INTERVAL = 1000; // interval for overheat temp sense sending (over can)
 const uint16_t MPPT_REQ_INTERVAL = 500;
 const uint16_t MC_REQ_INTERVAL = 500;
+const uint16_t MC_SEND_INTERVAL = 100;        // interval for sending throttle packets
 
 // drive parameters
 const float M_PER_SEC_TO_MPH = 2.237f;   // conversion factor from m/s to mph
@@ -62,7 +64,8 @@ const int MAX_CAN_PACKETS_PER_LOOP = 10; // Maximum number of receivable CAN pac
 const uint8_t NUM_TEMP_MODULES = 26;     // Number of temperature sensors
 const uint8_t CHARGE_TEMP = 45;          // battery temp threshold when current is positive
 const uint8_t DISCHARGE_TEMP = 60;       // battery temp threshold when current is negative
-const float RPM_TO_MPH = 2.2369f;        //Change for correct values, diameter 19 inch
+const float RPM_TO_MPH = 2.2369f;        // Change for correct values, diameter 19 inch
+const uint8_t MAX_VELOCITY = 100;        // max velocity for motor velocity setpoint
 
 // driver control errors
 const uint16_t MC_TIMEOUT = 0x01;    // motor controller timed out
@@ -136,6 +139,7 @@ Metro tempReadTimer(TEMP_READ_INTERVAL);         // timer for reading the values
 Metro tempSendTimer(TEMP_SEND_INTERVAL);         // timer for reading the values from temp sensorss
 Metro tempOverheatTimer(TEMP_OVERHEAT_INTERVAL); // timer for indication of overheat from temp sensors
 Metro mpptReqTimer(MPPT_REQ_INTERVAL);           //Timer for MPPT
+Metro mcSendTimer(MC_SEND_INTERVAL);
 
 // debugging variables
 #ifdef DEBUG
@@ -153,7 +157,23 @@ byte addr[8];
 byte i;  // just used as a counter variable to print out ALL temperatures in the serial debug section
 float j; // used as a counter when calculating Avg and Max temperatures
 
+//throttle variables
+uint16_t readings[2];   // current and previous readings of throttle
+uint8_t setpoint[2];    // current and previous throttle velocity setpoints
+
+
 //--------------------------HELPER FUNCTIONS--------------------------//
+/*
+ * Reads analog throttle, converts to velocity setpoint, returns velocity setpoint
+ */
+ void readThrottle()
+ {
+  readings[1] = readings[0];
+  readings[0] = analogRead(THROTTLE_PIN);
+  setpoint[1] = setpoint[0];
+  setpoint[0] = (int) map(readings[0],0,1023,0, MAX_VELOCITY);
+ }
+
 /*
  * Reads packets from CAN message queue and updates car state.
  */
@@ -336,6 +356,12 @@ void writeCAN()
     canControl.Send(MTBA_ReqCommRLeft(1u), TXBANY); //We only care about frame 0
     canControl.Send(MTBA_ReqCommRRight(1u), TXBANY);
   }
+
+  //throttle control
+  if(mcSendTimer.check())
+  {
+    canControl.Send(TRI88_Drive(setpoint[0], 100),TXBANY);  //Velocity control with 100% torque
+  }
 }
 
 /*
@@ -504,6 +530,7 @@ void setup()
 {
   pinMode(BOARDLED, OUTPUT);
   pinMode(BMS_STROBE_PIN, OUTPUT);
+  pinMode(THROTTLE_PIN, INPUT);
 
   digitalWrite(BOARDLED, HIGH); // Turn on durring initialization
 
