@@ -160,3 +160,8 @@ $RECYCLE.BIN/
 .vscode/launch.json
 *.json
 *.code-workspace
+SWControls/LCDv2019NonCAN/src/hashtable.h
+SWControls/LCDv2019NonCAN/src/sc7Dashboard_UI.cpp
+SWControls/LCDv2019NonCAN/src/sc7Dashboard_UI.h
+SWControls/LCDv2019NonCAN/LCDv2019NonCAN.ino
+CANRedefTest/CANRedefTest/CANRedefTest.ino

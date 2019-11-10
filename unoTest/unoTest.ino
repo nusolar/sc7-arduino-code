@@ -35,7 +35,7 @@ void setup() {
 
   if (CanControl.errors != 0)
   {
-    Serial.print("Init CAN error: ");
+    Serial.print(F("Init CAN error: "));
     Serial.println(CanControl.errors, HEX);
     byte Txstatus[3] = {0, 0, 0};
     Txstatus[0] = CanControl.controller.Read(TXB0CTRL);
@@ -46,17 +46,17 @@ void setup() {
     byte canctrl = 0;
     canctrl = CanControl.controller.Read(CANCTRL);
 
-    Serial.println("TXnCTRL: ");
+    Serial.println(F("TXnCTRL: "));
     Serial.println(Txstatus[0], BIN);
     Serial.println(Txstatus[1], BIN);
     Serial.println(Txstatus[2], BIN);
-    Serial.print("Last Interrupt: ");
+    Serial.print(F("Last Interrupt: "));
     Serial.println(canintf, BIN);
-    Serial.print("CANCTRL: ");
+    Serial.print(F("CANCTRL: "));
     Serial.println(canctrl, BIN);
-    Serial.print("CANSTAT: ");
+    Serial.print(F("CANSTAT: "));
     Serial.println(CanControl.canstat_register, BIN);
-    Serial.println("");
+    Serial.println(F(""));
   }
 
   Serial.println("\n\nTRYING TO SEND...");

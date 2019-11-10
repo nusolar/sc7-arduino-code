@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include <RA8875.h>
 #include "src/sc7Dashboard_UI.h"
+#include <includes/Layouts.h>
 
 #define RA8875_INT 4
 #define RA8875_CS 10
@@ -28,27 +29,14 @@
 #define GENERIC_TRIP_STR String("SOMETHING IS WRONG WITH YOUR CAR")
 
 //set up pins that connect to switch terminals
-#define ltp A9  //left turn
-#define rtp A10 //right turn
+#define ltp 2  //left turn
+#define rtp 3 //right turn
 
 //set up metro timer, these may be diff, check later
 //1st: switch state reading timer - frequency at which switches are read
-Metro switch_timer = Metro(100);
-//2nd: CAN Transmission timer - frequency at which CAN packets are sent if switch states have not changed
-Metro CAN_TX = Metro(1000);
-//3rd: CAN Reception timer - duration between CAN packets received (will trigger error if it expires)
 Metro CAN_RX = Metro(1000);
-//4th: Notification Timer - duration for which notification is displayed
-Metro notif_timer = Metro(500);
-//5th: Display Timer - frequency at which display will refresh if nothing changes
-Metro display_timer = Metro(500);
-//6th: Turn signal blinking timer
-Metro blinking_timer = Metro(500);
-//7th: Debug Timer
 Metro debug_timer = Metro(200);
 //8th: Telemetry HB timer
-Metro telmetry_timer = Metro(2500);
-//9th: Display update timer
 Metro disp_timer = Metro(333);
 
 //CAN parameters --> check these, may be diff
@@ -94,7 +82,7 @@ void setup()
 #ifdef DEBUG
   if (CanControl.errors != 0)
   {
-    Serial.print("Init CAN error: ");
+    Serial.print(F("Init CAN error: "));
     Serial.println(CanControl.errors, HEX);
 
     byte Txstatus[3] = {0, 0, 0};
@@ -106,17 +94,16 @@ void setup()
     byte canctrl = 0;
     canctrl = CanControl.controller.Read(CANCTRL);
 
-    Serial.println("TXnCTRL: ");
+    Serial.println(F("TXnCTRL: "));
     Serial.println(Txstatus[0], BIN);
     Serial.println(Txstatus[1], BIN);
     Serial.println(Txstatus[2], BIN);
-    Serial.print("Last Interrupt: ");
+    Serial.print(F("Last Interrupt: "));
     Serial.println(canintf, BIN);
-    Serial.print("CANCTRL: ");
+    Serial.print(F("CANCTRL: "));
     Serial.println(canctrl, BIN);
-    Serial.print("CANSTAT: ");
+    Serial.print(F("CANSTAT: "));
     Serial.println(CanControl.canstat_register, BIN);
-    Serial.println("");
   }
 #endif
 }
@@ -126,7 +113,7 @@ void loop()
   if (disp_timer.check())
   {
     tft.update(dispData);
-    Serial.println("Refresh");
+    Serial.println(F("Refresh"));
   }
   // Fetch any potential messages from the MCP2515
   CanControl.Fetch();
@@ -137,7 +124,7 @@ void loop()
     // Use available CAN packets to assign values to appropriate members of the data structures
     Frame &f = CanControl.Read();
 #ifdef DEBUG
-    //Serial.print("Received: ");
+    //Serial.print(F("Received: "));
     //Serial.println(f.id, HEX);
 #endif
     switch (f.id)

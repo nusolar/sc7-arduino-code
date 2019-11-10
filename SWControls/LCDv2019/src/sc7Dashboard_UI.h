@@ -7,13 +7,12 @@
 
 typedef struct
     {
-        float speed = 0;
-        float packCurr = 0;
-        float packVolt = 0;
-        float packSOC = 0;
-        float maxTemp = 0;
-        float avgTemp = 0;
-        String err = "";
+        uint16_t speed = 0;
+        uint16_t packCurr = 0;
+        uint16_t packVolt = 0;
+        uint16_t packSOC = 0;
+        uint16_t maxTemp = 0;
+        uint16_t avgTemp = 0;
 
     } displayData;
 
@@ -23,7 +22,6 @@ public:
     sc7Dashboard_UI(RA8875 _tft) : 
         tft(_tft) 
         { }
-    void updateError(String);
 
     // Setup display, only called once
     void begin(void);
@@ -45,7 +43,7 @@ private:
     // Updated Average Temperature on display
     void updateAvgTemp(int);
 
-    int screenHeight = 272;
-    int screenWidth = 480;
+    const int screenHeight = 272;
+    const int screenWidth = 480;
 };
 #endif

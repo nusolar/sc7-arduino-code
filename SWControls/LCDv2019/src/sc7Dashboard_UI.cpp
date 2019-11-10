@@ -37,16 +37,6 @@ void sc7Dashboard_UI::begin(void) {
  tft.fillRect(700/2,433/2,30/2,14/2,RA8875_YELLOW);
 }
 
-//Error Message
-void sc7Dashboard_UI::updateError(String error)
-{
- tft.setCursor(600/2,20/2);
- tft.setFontScale(0);
- tft.setTextColor(RA8875_WHITE,RA8875_BLACK);
- tft.print("Error: ");
- tft.print(error);
-}
-
 //Speed  
 void sc7Dashboard_UI::updateSpeed(int _speed) 
 {
@@ -125,7 +115,6 @@ void sc7Dashboard_UI::update(const displayData& dispData)
     tft.drawRect(0, screenHeight/3, screenWidth/2, screenHeight * 2/3, RA8875_WHITE); // Lower Left Corner
     
     //updates text
-    updateError(dispData.err);
     updateSpeed(dispData.speed);
     updatePackCurr(dispData.packCurr);
     updatePackVolt(dispData.packVolt);
