@@ -112,13 +112,7 @@ void loop()                     // run over and over again
       Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
       Serial.print(", ");
       Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
-      if(drivingFlag){
-       
-        {
-          drivingFlag = true;
-          lap++
-        }
-      }
+     
       Serial.print("Lap: "); Serial.print(lap);
     
       Serial.print("Speed (knots): "); Serial.println(GPS.speed);
